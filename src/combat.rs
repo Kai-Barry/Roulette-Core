@@ -1,29 +1,50 @@
-use crate::cards::{Card, CardEffect};
-use crate::rng::Rng;
-use crate::wheel::{Bet, Slot, SlotColor, Wheel};
+//! Modular Combat State Machine and Turn Execution Pipeline.
+//!
+//! Orchestrates combat and point-round lifecycle using abstract [`GameDevice`], [`Target`], and [`CombatMode`] traits.
 
+use crate::bet::Bet;
+use crate::cards::{Card, CardEffect};
+use crate::device::{EuropeanWheel, GameDevice, OutcomeSlot, SlotColor};
+use crate::mode::{CombatMode, CombatOutcome, GameModeKind, Standard1v1Mode};
+use crate::rng::Rng;
+use crate::target::{Enemy, Target};
+
+/// Represents player state during a combat or point-round encounter.
 #[derive(Debug, Clone)]
 pub struct Player {
-    pub hp: i32,
-    pub max_hp: i32,
+    /// Optional health points (tracked in Combat/Horde modes, None in Point Round mode).
+    pub hp: Option<i32>,
+    /// Optional maximum health points cap.
+    pub max_hp: Option<i32>,
+    /// Available chip balance for placing bets.
     pub chips: u32,
+    /// Draw pile of modifier cards.
     pub deck: Vec<Card>,
+    /// Active playable cards currently in hand.
     pub hand: Vec<Card>,
+    /// Discard pile for played or discarded cards.
     pub discard: Vec<Card>,
 }
 
 impl Player {
-    pub fn new(max_hp: i32, starting_chips: u32) -> Self {
+    /// Creates a new player for a specific game mode kind.
+    pub fn new_for_mode(mode_kind: GameModeKind, max_hp: Option<i32>, starting_chips: u32) -> Self {
         Player {
             hp: max_hp,
             max_hp,
             chips: starting_chips,
-            deck: Card::all_starter_cards(),
+            deck: Card::starter_deck_for_mode(mode_kind),
             hand: Vec::new(),
             discard: Vec::new(),
         }
     }
 
+    /// Helper for standard 1v1 combat initialization.
+    pub fn new(max_hp: i32, starting_chips: u32) -> Self {
+        Self::new_for_mode(GameModeKind::Combat1v1, Some(max_hp), starting_chips)
+    }
+
+    /// Draws `count` cards from deck to hand, automatically shuffling the discard pile into the deck when depleted.
     pub fn draw_cards(&mut self, count: usize, rng: &mut Rng) {
         for _ in 0..count {
             if self.deck.is_empty() && !self.discard.is_empty() {
@@ -37,84 +58,101 @@ impl Player {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum EnemyIntent {
-    Attack(i32),
-    Block(i32),
-    CorruptRed,
-}
-
-#[derive(Debug, Clone)]
-pub struct Enemy {
-    pub name: String,
-    pub hp: i32,
-    pub max_hp: i32,
-    pub intent: EnemyIntent,
-}
-
-impl Enemy {
-    pub fn create_pit_boss() -> Self {
-        Enemy {
-            name: "The Cursed Croupier".to_string(),
-            hp: 100,
-            max_hp: 100,
-            intent: EnemyIntent::Attack(15),
-        }
-    }
-
-    pub fn roll_intent(&mut self, rng: &mut Rng) {
-        let val = rng.range_i32(1, 3);
-        self.intent = match val {
-            1 => EnemyIntent::Attack(rng.range_i32(10, 20)),
-            2 => EnemyIntent::Block(rng.range_i32(5, 15)),
-            _ => EnemyIntent::CorruptRed,
-        };
-    }
-}
-
+/// Summary report returned after a turn/hand completes.
 #[derive(Debug, Clone)]
 pub struct TurnResult {
-    pub slot_landed: Slot,
+    /// The outcome slot landed on during spin/roll.
+    pub slot_landed: OutcomeSlot,
+    /// Total damage dealt to targets / points scored from winning bets.
     pub total_damage_dealt: i32,
+    /// Total chips won by player from payouts.
     pub total_chips_won: u32,
+    /// Damage dealt by enemies to player HP (0 in modes without enemy attacks).
     pub enemy_damage_dealt: i32,
+    /// Current encounter outcome status.
+    pub outcome: CombatOutcome,
+    /// Sequential text log of events occurring during turn.
     pub log_messages: Vec<String>,
 }
 
+/// Complete modular battle / round encounter state.
 #[derive(Debug, Clone)]
 pub struct CombatState {
+    /// Player state.
     pub player: Player,
-    pub enemy: Enemy,
-    pub wheel: Wheel,
+    /// Active targets / opponents in combat (or score target dummy in Point Round mode).
+    pub targets: Vec<Box<dyn Target>>,
+    /// Active randomizer device (Wheel, Dice, Slot Machine, Pachinko).
+    pub device: Box<dyn GameDevice>,
+    /// Active combat mode strategy (1v1, Horde, Point Round).
+    pub mode: Box<dyn CombatMode>,
+    /// Current turn / hand counter.
     pub turn_number: u32,
+    /// Seedable PRNG instance.
     pub rng: Rng,
 }
 
 impl CombatState {
+    /// Creates a standard 1v1 battle encounter against "The Cursed Croupier" on a European Wheel.
     pub fn new(seed: &str) -> Self {
         let mut rng = Rng::from_str(seed);
-        let mut player = Player::new(100, 50);
+        let mode: Box<dyn CombatMode> = Box::new(Standard1v1Mode::default());
+        let mut player = Player::new_for_mode(mode.mode_kind(), Some(100), 50);
         player.draw_cards(3, &mut rng);
-        let enemy = Enemy::create_pit_boss();
-        let wheel = Wheel::european();
+
+        let target: Box<dyn Target> = Box::new(Enemy::create_pit_boss());
+        let device: Box<dyn GameDevice> = Box::new(EuropeanWheel::new());
 
         CombatState {
             player,
-            enemy,
-            wheel,
+            targets: vec![target],
+            device,
+            mode,
             turn_number: 1,
             rng,
         }
     }
 
-    /// Execute a turn with selected active played cards and player bets.
+    /// Creates a fully custom encounter with custom device, targets, and game mode.
+    pub fn new_custom(
+        seed: &str,
+        device: Box<dyn GameDevice>,
+        targets: Vec<Box<dyn Target>>,
+        mode: Box<dyn CombatMode>,
+    ) -> Self {
+        let mut rng = Rng::from_str(seed);
+        let max_hp = if mode.has_player_hp() { Some(100) } else { None };
+        let mut player = Player::new_for_mode(mode.mode_kind(), max_hp, 50);
+        player.draw_cards(3, &mut rng);
+
+        CombatState {
+            player,
+            targets,
+            device,
+            mode,
+            turn_number: 1,
+            rng,
+        }
+    }
+
+    /// Convenience getter for first target.
+    pub fn enemy(&self) -> &dyn Target {
+        self.targets[0].as_ref()
+    }
+
+    /// Convenience mutable getter for first target.
+    pub fn enemy_mut(&mut self) -> &mut dyn Target {
+        self.targets[0].as_mut()
+    }
+
+    /// Executes a complete turn/hand lifecycle against active device and target entities.
     pub fn execute_turn(
         &mut self,
         played_card_indices: &[usize],
         bets: &[Bet],
     ) -> TurnResult {
         let mut logs = Vec::new();
-        logs.push(format!("--- TURN {} START ---", self.turn_number));
+        logs.push(format!("--- TURN/HAND {} START [{}] ---", self.turn_number, self.device.name()));
 
         let mut red_payout_boost = 0.0;
         let mut reroll_on_loss = false;
@@ -126,11 +164,11 @@ impl CombatState {
             if idx < self.player.hand.len() {
                 let card = self.player.hand.remove(idx);
                 logs.push(format!("Player played card: {}", card.name));
-                
-                // Apply wheel modifications
-                card.apply_to_wheel(&mut self.wheel);
 
-                // Handle other card effects
+                // Apply device modifications
+                card.apply_to_device(self.device.as_mut());
+
+                // Handle card effects
                 match &card.effect {
                     CardEffect::BoostPayout { color, bonus_multiplier } => {
                         if *color == SlotColor::Red {
@@ -140,9 +178,15 @@ impl CombatState {
                     CardEffect::RerollOnLoss => reroll_on_loss = true,
                     CardEffect::DoubleDown => double_down = true,
                     CardEffect::BloodSacrifice { hp_cost, chips_gained } => {
-                        self.player.hp -= hp_cost;
+                        if let Some(ref mut hp) = self.player.hp {
+                            *hp -= hp_cost;
+                            logs.push(format!("Sacrificed {} HP for {} chips!", hp_cost, chips_gained));
+                        }
                         self.player.chips += chips_gained;
-                        logs.push(format!("Sacrificed {} HP for {} chips!", hp_cost, chips_gained));
+                    }
+                    CardEffect::HandSacrifice { hands_cost: _, chips_gained } => {
+                        self.player.chips += chips_gained;
+                        logs.push(format!("Activated Greed Pact: Gained {} chips!", chips_gained));
                     }
                     _ => {}
                 }
@@ -156,11 +200,11 @@ impl CombatState {
             self.player.chips -= total_bet_amount;
         }
 
-        // 2. Spin Wheel (Deterministic)
-        let mut slot = self.wheel.spin(&mut self.rng);
-        logs.push(format!("Roulette spun... Landed on Number {} ({})", slot.number, slot.color));
+        // 2. Spin/Roll Device (Deterministic)
+        let mut slot = self.device.spin(&mut self.rng);
+        logs.push(format!("Device spun... Landed on Number {} ({})", slot.number, slot.color));
 
-        // Evaluate Bets & Damage
+        // Evaluate Bets & Damage / Points
         let mut win = false;
         let mut total_damage = 0.0;
         let mut total_chips_won = 0;
@@ -178,51 +222,56 @@ impl CombatState {
                 let payout = (bet.amount as f64 * mult) as u32;
                 total_chips_won += payout;
                 total_damage += payout as f64;
-                logs.push(format!("BET WON! Type: {:?}, Payout: {} dmg", bet.bet_type, payout));
+                logs.push(format!("BET WON! Type: {:?}, Payout/Score: {} pts", bet.bet_type, payout));
             }
         }
 
         // Reroll logic
         if !win && reroll_on_loss {
-            logs.push("RerollOnLoss triggered! Respinning wheel...".to_string());
-            slot = self.wheel.spin(&mut self.rng);
-            logs.push(format!("Respun wheel landed on Number {} ({})", slot.number, slot.color));
+            logs.push("RerollOnLoss triggered! Respinning device...".to_string());
+            slot = self.device.spin(&mut self.rng);
+            logs.push(format!("Respun device landed on Number {} ({})", slot.number, slot.color));
             for bet in bets {
                 if bet.evaluates_win(&slot) {
                     let mult = bet.base_payout_multiplier();
                     let payout = (bet.amount as f64 * mult) as u32;
                     total_chips_won += payout;
                     total_damage += payout as f64;
-                    logs.push(format!("REROLL BET WON! Payout: {} dmg", payout));
+                    logs.push(format!("REROLL BET WON! Payout/Score: {} pts", payout));
                 }
             }
         }
 
         let damage_dealt = total_damage as i32;
-        self.enemy.hp -= damage_dealt;
         self.player.chips += total_chips_won;
 
-        // 3. Enemy Action
-        let mut enemy_dmg = 0;
-        if self.enemy.hp > 0 {
-            match self.enemy.intent {
-                EnemyIntent::Attack(dmg) => {
-                    enemy_dmg = dmg;
-                    self.player.hp -= enemy_dmg;
-                    logs.push(format!("Enemy attacked for {} damage!", enemy_dmg));
-                }
-                EnemyIntent::Block(block) => {
-                    self.enemy.hp += block;
-                    logs.push(format!("Enemy blocked for {} shield!", block));
-                }
-                EnemyIntent::CorruptRed => {
-                    self.wheel.recolor_range(1, 18, SlotColor::Green);
-                    logs.push("Enemy corrupted slots 1-18 to Green!".to_string());
+        // Apply damage/score to primary target
+        if let Some(target) = self.targets.iter_mut().find(|t| t.is_alive()) {
+            target.take_damage(damage_dealt);
+        }
+
+        // 3. Enemy Action Phase (Skipped if mode has no enemy attacks, e.g. PointRoundMode)
+        let mut total_enemy_dmg = 0;
+        if self.mode.has_enemy_attacks() {
+            for target in self.targets.iter_mut() {
+                if target.is_alive() {
+                    let (enemy_dmg, log_msg) = target.execute_intent(self.device.as_mut(), &mut self.rng);
+                    if let Some(ref mut hp) = self.player.hp {
+                        *hp -= enemy_dmg;
+                    }
+                    total_enemy_dmg += enemy_dmg;
+                    logs.push(log_msg);
                 }
             }
-            self.enemy.roll_intent(&mut self.rng);
-        } else {
-            logs.push("VICTORY! Enemy defeated!".to_string());
+        }
+
+        // 4. Evaluate Victory / Defeat Outcome via CombatMode Strategy
+        let outcome = self.mode.evaluate_outcome(self.player.hp, &self.targets, self.turn_number);
+        match outcome {
+            CombatOutcome::PlayerVictory => logs.push("VICTORY! Target score / encounter completed!".to_string()),
+            CombatOutcome::PlayerDefeat => logs.push("DEFEAT! Encounter failed!".to_string()),
+            CombatOutcome::TurnLimitReached => logs.push("DRAW / END! Limit reached!".to_string()),
+            CombatOutcome::InProgress => {}
         }
 
         // Cleanup turn hand
@@ -234,8 +283,22 @@ impl CombatState {
             slot_landed: slot,
             total_damage_dealt: damage_dealt,
             total_chips_won,
-            enemy_damage_dealt: enemy_dmg,
+            enemy_damage_dealt: total_enemy_dmg,
+            outcome,
             log_messages: logs,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_modular_combat_initialization() {
+        let state = CombatState::new("test_seed");
+        assert_eq!(state.player.hp, Some(100));
+        assert_eq!(state.enemy().hp(), 100);
+        assert_eq!(state.turn_number, 1);
     }
 }
