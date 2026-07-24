@@ -1,0 +1,18 @@
+[package]
+name = "roulette_core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kai-Barry"]
+description = "Fast, deterministic, headless roulette roguelike engine and simulator"
+default-run = "roulette_core"
+
+[dependencies]
+# Zero required external dependencies for ultra-fast compilation and pure determinism
+
+[[bin]]
+name = "roulette_core"
+path = "src/main.rs"
+
+[[bin]]
+name = "simulate"
+path = "src/bin/simulate.rs"
