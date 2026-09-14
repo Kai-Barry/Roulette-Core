@@ -26,12 +26,16 @@ pub enum CardEffect {
     BoostPayout { color: SlotColor, bonus_multiplier: f64 },
     /// Adds an extra Green zero slot to the device.
     AddGreenSlot,
+    /// Adds a special Gold Jackpot slot to the device.
+    AddJackpotSlot,
     /// Recolors a range of numbers to a specified color.
     RecolorRange { start: u32, end: u32, color: SlotColor },
     /// Grants a free automatic re-spin if the initial spin results in a loss.
     RerollOnLoss,
     /// Doubles payouts on all winning bets for the current turn.
     DoubleDown,
+    /// Instantly gains free chips.
+    GainChips(u32),
     /// Sacrifices player health to instantly gain chips (Combat 1v1 / Survival modes).
     BloodSacrifice { hp_cost: i32, chips_gained: u32 },
     /// Sacrifices 1 Hand to instantly gain bonus chips (Point Round / Hand Limit mode).
@@ -58,9 +62,9 @@ pub struct Card {
 }
 
 impl Card {
-    /// Returns the standard card pool filtered for a specific [`GameModeKind`].
-    pub fn starter_deck_for_mode(mode: GameModeKind) -> Vec<Card> {
-        let all = vec![
+    /// Returns the complete expanded card library pool.
+    pub fn expanded_card_library() -> Vec<Card> {
+        vec![
             Card {
                 id: "red_fever",
                 name: "Red Fever",
@@ -71,7 +75,19 @@ impl Card {
                     color: SlotColor::Red,
                     bonus_multiplier: 0.5,
                 },
-                supported_modes: vec![], // All modes
+                supported_modes: vec![],
+            },
+            Card {
+                id: "black_fever",
+                name: "Black Fever",
+                card_type: CardType::RouletteModifier,
+                cost: 1,
+                description: "+0.5x payout to Black bets this turn.",
+                effect: CardEffect::BoostPayout {
+                    color: SlotColor::Black,
+                    bonus_multiplier: 0.5,
+                },
+                supported_modes: vec![],
             },
             Card {
                 id: "green_corruption",
@@ -80,7 +96,16 @@ impl Card {
                 cost: 0,
                 description: "Add an extra Green slot to the device.",
                 effect: CardEffect::AddGreenSlot,
-                supported_modes: vec![], // All modes
+                supported_modes: vec![],
+            },
+            Card {
+                id: "jackpot_slot",
+                name: "Jackpot Slot",
+                card_type: CardType::BoardModifier,
+                cost: 1,
+                description: "Add a Gold Jackpot slot to the wheel.",
+                effect: CardEffect::AddJackpotSlot,
+                supported_modes: vec![],
             },
             Card {
                 id: "red_shift",
@@ -93,7 +118,20 @@ impl Card {
                     end: 12,
                     color: SlotColor::Red,
                 },
-                supported_modes: vec![], // All modes
+                supported_modes: vec![],
+            },
+            Card {
+                id: "black_shift",
+                name: "Obsidian Sector",
+                card_type: CardType::BoardModifier,
+                cost: 2,
+                description: "Recolor numbers 13 through 24 to Black.",
+                effect: CardEffect::RecolorRange {
+                    start: 13,
+                    end: 24,
+                    color: SlotColor::Black,
+                },
+                supported_modes: vec![],
             },
             Card {
                 id: "loaded_dice",
@@ -102,7 +140,16 @@ impl Card {
                 cost: 2,
                 description: "If your spin loses, automatically respin once.",
                 effect: CardEffect::RerollOnLoss,
-                supported_modes: vec![], // All modes
+                supported_modes: vec![],
+            },
+            Card {
+                id: "chip_surge",
+                name: "Chip Surge",
+                card_type: CardType::RiskUtility,
+                cost: 0,
+                description: "Gain 15 Chips instantly.",
+                effect: CardEffect::GainChips(15),
+                supported_modes: vec![],
             },
             Card {
                 id: "blood_pact",
@@ -135,11 +182,15 @@ impl Card {
                 cost: 1,
                 description: "Double your bet payout on win.",
                 effect: CardEffect::DoubleDown,
-                supported_modes: vec![], // All modes
+                supported_modes: vec![],
             },
-        ];
+        ]
+    }
 
-        all.into_iter()
+    /// Returns the standard card pool filtered for a specific [`GameModeKind`].
+    pub fn starter_deck_for_mode(mode: GameModeKind) -> Vec<Card> {
+        Self::expanded_card_library()
+            .into_iter()
             .filter(|c| c.supported_modes.is_empty() || c.supported_modes.contains(&mode))
             .collect()
     }
@@ -158,6 +209,12 @@ impl Card {
     pub fn apply_to_device(&self, device: &mut dyn GameDevice) {
         match &self.effect {
             CardEffect::AddGreenSlot => device.add_slot(OutcomeSlot::new(0, SlotColor::Green)),
+            CardEffect::AddJackpotSlot => {
+                let mut slot = OutcomeSlot::new(77, SlotColor::Custom("Gold"));
+                slot.tags.push("jackpot");
+                slot.multiplier_bonus = 50.0;
+                device.add_slot(slot);
+            }
             CardEffect::RecolorRange { start, end, color } => device.recolor_range(*start, *end, *color),
             _ => {}
         }

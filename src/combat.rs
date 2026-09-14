@@ -177,6 +177,10 @@ impl CombatState {
                     }
                     CardEffect::RerollOnLoss => reroll_on_loss = true,
                     CardEffect::DoubleDown => double_down = true,
+                    CardEffect::GainChips(amount) => {
+                        self.player.chips += amount;
+                        logs.push(format!("Activated Chip Surge: Gained {} chips!", amount));
+                    }
                     CardEffect::BloodSacrifice { hp_cost, chips_gained } => {
                         if let Some(ref mut hp) = self.player.hp {
                             *hp -= hp_cost;

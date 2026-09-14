@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roulette of the Damned - Engine Testing Harness</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0a0f;
+      --bg-card: rgba(22, 24, 35, 0.85);
+      --bg-card-hover: rgba(32, 36, 52, 0.95);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --border-accent: #ff3b5c;
+      --accent-red: #ff2a4b;
+      --accent-green: #00e676;
+      --accent-black: #1e2029;
+      --accent-gold: #ffd700;
+      --accent-blue: #00b0ff;
+      --accent-purple: #b388ff;
+      --text-main: #f0f2f5;
+      --text-muted: #8e95a5;
+      --font-main: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(255, 42, 75, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(0, 230, 118, 0.06) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(0, 176, 255, 0.04) 0%, transparent 60%);
+      color: var(--text-main);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    header {
+      background: rgba(10, 10, 15, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent-red), var(--accent-gold));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: #000;
+      box-shadow: 0 0 15px rgba(255, 42, 75, 0.4);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, #fff, var(--text-muted));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-badge {
+      background: rgba(255, 215, 0, 0.15);
+      color: var(--accent-gold);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .mode-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .mode-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-main);
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .mode-btn:hover {
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .mode-btn.active {
+      background: linear-gradient(135deg, rgba(255, 42, 75, 0.2), rgba(0, 176, 255, 0.2));
+      color: var(--text-main);
+      border-color: var(--border-accent);
+      box-shadow: 0 0 10px rgba(255, 59, 92, 0.3);
+    }
+
+    .action-btn-secondary {
+      background: rgba(179, 136, 255, 0.15);
+      color: var(--accent-purple);
+      border: 1px solid rgba(179, 136, 255, 0.3);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn-secondary:hover {
+      background: rgba(179, 136, 255, 0.3);
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 12px rgba(179, 136, 255, 0.4);
+    }
+
+    main {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .game-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .wheel-arena {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 320px;
+      height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas {
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(255, 255, 255, 0.05);
+    }
+
+    .wheel-pointer {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-top: 24px solid var(--accent-gold);
+      z-index: 10;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));
+    }
+
+    .result-badge {
+      margin-top: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.75rem 1.5rem;
+      border-radius: 50px;
+      border: 1px solid var(--border-color);
+    }
+
+    .result-number {
+      font-size: 2.2rem;
+      font-weight: 900;
+      font-family: var(--font-mono);
+      line-height: 1;
+    }
+
+    .result-color {
+      text-transform: uppercase;
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+      padding: 0.3rem 0.8rem;
+      border-radius: 12px;
+    }
+
+    .color-red { background: var(--accent-red); color: #fff; }
+    .color-black { background: var(--accent-black); color: #fff; border: 1px solid #444; }
+    .color-green { background: var(--accent-green); color: #000; }
+    .color-gold { background: var(--accent-gold); color: #000; font-weight: 900; }
+
+    .status-hud {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+    }
+
+    .hud-box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .hud-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .hud-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+    }
+
+    .hud-progress {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 0.25rem;
+    }
+
+    .hud-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .cards-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .cards-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 1rem;
+    }
+
+    .card-item {
+      background: rgba(15, 18, 28, 0.9);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1rem;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 155px;
+      position: relative;
+      user-select: none;
+    }
+
+    .card-item:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent-blue);
+      box-shadow: 0 8px 20px rgba(0, 176, 255, 0.15);
+    }
+
+    .card-item.selected {
+      border-color: var(--accent-gold);
+      background: linear-gradient(145deg, rgba(255, 215, 0, 0.12), rgba(20, 24, 36, 0.95));
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+      transform: translateY(-4px);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-name {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--text-main);
+    }
+
+    .card-cost {
+      background: rgba(255, 215, 0, 0.2);
+      color: var(--accent-gold);
+      border: 1px solid rgba(255, 215, 0, 0.4);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    .card-desc {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      line-height: 1.35;
+      margin-top: 0.4rem;
+    }
+
+    .card-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--accent-blue);
+      align-self: flex-start;
+      margin-top: auto;
+    }
+
+    .bet-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .bet-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 600px) {
+      .bet-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .bet-pill {
+      background: rgba(10, 12, 20, 0.8);
+      border: 1px solid var(--border-color);
+      padding: 0.75rem;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .bet-pill:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .bet-pill.active {
+      border-color: var(--accent-gold);
+      background: rgba(255, 215, 0, 0.12);
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+    }
+
+    .bet-type-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .bet-type-mult {
+      font-size: 0.75rem;
+      color: var(--accent-gold);
+      font-weight: 600;
+    }
+
+    .bet-controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .chip-input-group {
+      display: flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 0.3rem 0.75rem;
+      gap: 0.5rem;
+    }
+
+    .chip-input-group input {
+      background: transparent;
+      border: none;
+      color: var(--accent-gold);
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      width: 80px;
+      outline: none;
+    }
+
+    .quick-chips {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .chip-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.4rem 0.75rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chip-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .spin-btn {
+      flex: 1;
+      min-width: 180px;
+      background: linear-gradient(135deg, var(--accent-red), #d81b60);
+      color: #fff;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      font-family: var(--font-main);
+      font-weight: 900;
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(255, 42, 75, 0.4);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .spin-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(255, 42, 75, 0.6);
+    }
+
+    .spin-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .log-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.25rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-height: 700px;
+    }
+
+    .log-stream {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      overflow-y: auto;
+      margin-top: 1rem;
+      padding-right: 0.5rem;
+    }
+
+    .log-entry {
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.3);
+      border-left: 3px solid var(--accent-blue);
+      line-height: 1.4;
+    }
+
+    .log-entry.win { border-left-color: var(--accent-green); color: #b9f6ca; }
+    .log-entry.loss { border-left-color: var(--accent-red); color: #ff8a80; }
+    .log-entry.card { border-left-color: var(--accent-gold); color: #ffe57f; }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: var(--bg-card);
+      border: 2px solid var(--accent-gold);
+      border-radius: 24px;
+      padding: 2rem;
+      max-width: 680px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 215, 0, 0.2);
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-title {
+      font-size: 1.8rem;
+      font-weight: 900;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #fff, var(--accent-gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .modal-subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .library-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 0.85rem;
+      overflow-y: auto;
+      padding: 0.5rem;
+      margin-bottom: 1.5rem;
+      max-height: 400px;
+    }
+
+    .modal-btn {
+      background: linear-gradient(135deg, var(--accent-gold), #ffab00);
+      color: #000;
+      font-weight: 900;
+      border: none;
+      padding: 0.85rem 2rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      cursor: pointer;
+      align-self: center;
+    }
+
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">R</div>
+      <div class="brand-title">ROULETTE OF THE DAMNED</div>
+      <div class="brand-badge">Engine Testing Harness</div>
+    </div>
+    <div class="mode-controls">
+      <button class="mode-btn active" id="btn-mode-point" onclick="selectMode('PointRound')">Point Round Mode</button>
+      <button class="mode-btn" id="btn-mode-1v1" onclick="selectMode('Combat1v1')">1v1 Survival Mode</button>
+      <button class="mode-btn" id="btn-mode-horde" onclick="selectMode('HordeSurvival')">Elemental D6 Horde</button>
+      <button class="action-btn-secondary" onclick="openDeckManager()">🎴 Deck Customizer</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="game-section">
+      
+      <div class="status-hud">
+        <div class="hud-box">
+          <div class="hud-label" id="hud-label-round">Hand Progress</div>
+          <div class="hud-value" id="hud-val-round">Hand 1 / 4</div>
+          <div class="hud-progress"><div class="hud-progress-fill" id="hud-fill-round" style="width: 25%"></div></div>
+        </div>
+
+        <div class="hud-box">
+          <div class="hud-label" id="hud-label-score">Current Score</div>
+          <div class="hud-value" id="hud-val-score" style="color: var(--accent-gold)">0 PTS</div>
+          <div class="hud-progress"><div class="hud-progress-fill" id="hud-fill-score" style="width: 0%; background: var(--accent-gold)"></div></div>
+        </div>
+
+        <div class="hud-box">
+          <div class="hud-label">Chip Balance</div>
+          <div class="hud-value" id="hud-val-chips" style="color: var(--accent-green)">50</div>
+        </div>
+
+        <div class="hud-box" id="hud-box-target" style="display: none;">
+          <div class="hud-label">Target HP</div>
+          <div class="hud-value" id="hud-val-target-hp">100 / 100</div>
+          <div class="hud-progress"><div class="hud-progress-fill" id="hud-fill-target-hp" style="width: 100%; background: var(--accent-red)"></div></div>
+        </div>
+      </div>
+
+      <div class="wheel-arena">
+        <div class="canvas-container">
+          <div class="wheel-pointer"></div>
+          <canvas id="wheelCanvas" width="320" height="320"></canvas>
+        </div>
+
+        <div class="result-badge">
+          <div class="result-number" id="res-number">--</div>
+          <div class="result-color color-black" id="res-color">READY</div>
+        </div>
+      </div>
+
+      <div class="cards-section">
+        <div class="section-title">
+          <span>Active Hand Cards (Click to Play)</span>
+          <div class="cards-controls">
+            <button class="chip-btn" onclick="drawNewHand()">🔄 Redraw Hand</button>
+            <span style="font-size: 0.75rem; color: var(--accent-gold); margin-left: 0.5rem;" id="cards-selected-count">0 Selected</span>
+          </div>
+        </div>
+        <div class="cards-grid" id="cards-grid">
+        </div>
+      </div>
+
+      <div class="bet-section">
+        <div class="section-title">Select Bet Category</div>
+        <div class="bet-grid" id="bet-grid">
+          <div class="bet-pill active" onclick="selectBet('Red', 2.0)">
+            <span class="bet-type-title">RED</span>
+            <span class="bet-type-mult">2.0x</span>
+          </div>
+          <div class="bet-pill" onclick="selectBet('Black', 2.0)">
+            <span class="bet-type-title">BLACK</span>
+            <span class="bet-type-mult">2.0x</span>
+          </div>
+          <div class="bet-pill" onclick="selectBet('Green', 14.0)">
+            <span class="bet-type-title">GREEN</span>
+            <span class="bet-type-mult">14.0x</span>
+          </div>
+          <div class="bet-pill" onclick="selectBet('ExactNumber', 36.0)">
+            <span class="bet-type-title">EXACT #</span>
+            <span class="bet-type-mult">36.0x</span>
+          </div>
+          <div class="bet-pill" onclick="selectBet('Even', 2.0)">
+            <span class="bet-type-title">EVEN</span>
+            <span class="bet-type-mult">2.0x</span>
+          </div>
+          <div class="bet-pill" onclick="selectBet('Odd', 2.0)">
+            <span class="bet-type-title">ODD</span>
+            <span class="bet-type-mult">2.0x</span>
+          </div>
+          <div class="bet-pill" onclick="selectBet('High', 2.0)">
+            <span class="bet-type-title">HIGH (19-36)</span>
+            <span class="bet-type-mult">2.0x</span>
+          </div>
+          <div class="bet-pill" onclick="selectBet('Low', 2.0)">
+            <span class="bet-type-title">LOW (1-18)</span>
+            <span class="bet-type-mult">2.0x</span>
+          </div>
+        </div>
+
+        <div class="bet-controls">
+          <div class="chip-input-group">
+            <span style="color: var(--text-muted); font-size: 0.85rem">BET:</span>
+            <input type="number" id="chip-amount" value="10" min="1">
+          </div>
+
+          <div class="quick-chips">
+            <button class="chip-btn" onclick="addChips(5)">+5</button>
+            <button class="chip-btn" onclick="addChips(10)">+10</button>
+            <button class="chip-btn" onclick="addChips(25)">+25</button>
+            <button class="chip-btn" onclick="allInChips()">ALL IN</button>
+          </div>
+
+          <button class="spin-btn" id="spin-btn" onclick="executeSpin()">SPIN & RESOLVE</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="sidebar">
+      <div class="log-panel">
+        <div class="section-title">Turn & Event Log</div>
+        <div class="log-stream" id="log-stream">
+          <div class="log-entry">Engine initialized. Select mode and place bets.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- GAME END MODAL -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal-card">
+      <div class="modal-title" id="modal-title">VICTORY!</div>
+      <div class="modal-subtitle" id="modal-subtitle">You achieved the target score quota!</div>
+      <button class="modal-btn" onclick="resetEncounter()">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- DECK CUSTOMIZER MODAL -->
+  <div class="modal-overlay" id="deck-modal">
+    <div class="modal-card">
+      <div class="modal-title">🎴 Card Library & Deck Customizer</div>
+      <div class="modal-subtitle">Click cards to toggle them into your active deck pool!</div>
+      <div class="library-grid" id="library-grid">
+      </div>
+      <button class="modal-btn" onclick="closeDeckManager()">SAVE & CLOSE</button>
+    </div>
+  </div>
+
+  <script>
+    class Mulberry32 {
+      constructor(seed) {
+        this.state = seed >>> 0;
+      }
+      static fromString(seedStr) {
+        let hash = 5381;
+        for (let i = 0; i < seedStr.length; i++) {
+          hash = (Math.imul(33, hash) + seedStr.charCodeAt(i)) >>> 0;
+        }
+        return new Mulberry32(hash);
+      }
+      nextU32() {
+        this.state = (this.state + 0x6D2B79F5) >>> 0;
+        let z = this.state;
+        z = Math.imul(z ^ (z >>> 15), z | 1);
+        z ^= z + Math.imul(z ^ (z >>> 7), z | 61);
+        return (z ^ (z >>> 14)) >>> 0;
+      }
+    }
+
+    let currentMode = 'PointRound';
+    let rng = Mulberry32.fromString('test_seed_' + Date.now());
+    let turnNumber = 1;
+    let maxHands = 4;
+    let targetScore = 200;
+    let currentScore = 0;
+    let chips = 50;
+    let playerHp = 100;
+    let targetHp = 100;
+    let selectedBetType = 'Red';
+    let selectedCards = new Set();
+    let isSpinning = false;
+    let wheelAngle = 0;
+
+    const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+    let slots = [{ number: 0, color: 'Green' }];
+    for (let n = 1; n <= 36; n++) {
+      slots.push({ number: n, color: redNumbers.includes(n) ? 'Red' : 'Black' });
+    }
+
+    // EXPANDED CARD LIBRARY (11 Cards)
+    const cardPool = [
+      { id: 'red_fever', name: 'Red Fever', cost: 1, desc: '+0.5x payout to Red bets this turn.', type: 'RouletteModifier', mode: 'all' },
+      { id: 'black_fever', name: 'Black Fever', cost: 1, desc: '+0.5x payout to Black bets this turn.', type: 'RouletteModifier', mode: 'all' },
+      { id: 'green_corruption', name: 'Green Corruption', cost: 0, desc: 'Add an extra Green slot to device.', type: 'BoardModifier', mode: 'all' },
+      { id: 'jackpot_slot', name: 'Jackpot Slot', cost: 1, desc: 'Add a Gold 50x Jackpot slot to wheel.', type: 'BoardModifier', mode: 'all' },
+      { id: 'red_shift', name: 'Crimson Sector', cost: 2, desc: 'Recolor numbers 1-12 to Red.', type: 'BoardModifier', mode: 'all' },
+      { id: 'black_shift', name: 'Obsidian Sector', cost: 2, desc: 'Recolor numbers 13-24 to Black.', type: 'BoardModifier', mode: 'all' },
+      { id: 'second_chance', name: 'Second Chance', cost: 2, desc: 'If spin loses, automatically respin once.', type: 'RerollPhysics', mode: 'all' },
+      { id: 'chip_surge', name: 'Chip Surge', cost: 0, desc: 'Gain +15 Chips instantly.', type: 'RiskUtility', mode: 'all' },
+      { id: 'greed_pact', name: 'Greed Pact', cost: 0, desc: 'Sacrifice 1 Hand to gain 30 Chips.', type: 'RiskUtility', mode: 'PointRound' },
+      { id: 'blood_pact', name: 'Blood Pact', cost: 0, desc: 'Sacrifice 10 HP to gain 20 Chips.', type: 'RiskUtility', mode: 'Combat1v1' },
+      { id: 'double_down', name: 'Double Down', cost: 1, desc: 'Double your winning bet payout.', type: 'RiskUtility', mode: 'all' }
+    ];
+
+    let activeDeckIds = new Set(cardPool.map(c => c.id));
+    let hand = [];
+
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function drawWheel() {
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = 150;
+      const total = slots.length;
+      const sliceAngle = (2 * Math.PI) / total;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      slots.forEach((slot, i) => {
+        const startAngle = wheelAngle + i * sliceAngle;
+        const endAngle = startAngle + sliceAngle;
+
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.closePath();
+
+        if (slot.color === 'Red') ctx.fillStyle = '#ff2a4b';
+        else if (slot.color === 'Black') ctx.fillStyle = '#1e2029';
+        else if (slot.color === 'Gold') ctx.fillStyle = '#ffd700';
+        else ctx.fillStyle = '#00e676';
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(startAngle + sliceAngle / 2);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = (slot.color === 'Green' || slot.color === 'Gold') ? '#000' : '#fff';
+        ctx.font = 'bold 11px Outfit';
+        ctx.fillText(slot.number, radius - 12, 4);
+        ctx.restore();
+      });
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 40, 0, 2 * Math.PI);
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fill();
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    function init() {
+      drawNewHand();
+      updateHUD();
+      drawWheel();
+    }
+
+    function drawNewHand() {
+      const validPool = cardPool.filter(c => activeDeckIds.has(c.id) && (c.mode === 'all' || c.mode === currentMode));
+      hand = [];
+      const tempPool = [...validPool];
+      for (let i = 0; i < Math.min(4, validPool.length); i++) {
+        const idx = rng.nextU32() % tempPool.length;
+        hand.push(tempPool.splice(idx, 1)[0]);
+      }
+      selectedCards.clear();
+      renderCards();
+    }
+
+    function selectMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+      if (mode === 'PointRound') document.getElementById('btn-mode-point').classList.add('active');
+      if (mode === 'Combat1v1') document.getElementById('btn-mode-1v1').classList.add('active');
+      if (mode === 'HordeSurvival') document.getElementById('btn-mode-horde').classList.add('active');
+      resetEncounter();
+    }
+
+    function renderCards() {
+      const grid = document.getElementById('cards-grid');
+      grid.innerHTML = '';
+
+      hand.forEach((card, index) => {
+        const isSelected = selectedCards.has(index);
+        const cardEl = document.createElement('div');
+        cardEl.className = `card-item ${isSelected ? 'selected' : ''}`;
+        cardEl.onclick = () => toggleCard(index);
+        cardEl.innerHTML = `
+          <div class="card-header">
+            <span class="card-name">${card.name}</span>
+            <span class="card-cost">${card.cost}</span>
+          </div>
+          <div class="card-desc">${card.desc}</div>
+          <div class="card-badge">${card.type}</div>
+        `;
+        grid.appendChild(cardEl);
+      });
+
+      document.getElementById('cards-selected-count').textContent = `${selectedCards.size} Selected`;
+    }
+
+    function toggleCard(index) {
+      if (selectedCards.has(index)) selectedCards.delete(index);
+      else selectedCards.add(index);
+      renderCards();
+    }
+
+    function selectBet(type, mult) {
+      selectedBetType = type;
+      document.querySelectorAll('.bet-pill').forEach(p => p.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+    }
+
+    function addChips(amount) {
+      const input = document.getElementById('chip-amount');
+      input.value = Math.min(chips, parseInt(input.value || 0) + amount);
+    }
+
+    function allInChips() {
+      document.getElementById('chip-amount').value = chips;
+    }
+
+    function updateHUD() {
+      if (currentMode === 'PointRound') {
+        document.getElementById('hud-label-round').textContent = 'Hand Progress';
+        document.getElementById('hud-val-round').textContent = `Hand ${turnNumber} / ${maxHands}`;
+        document.getElementById('hud-fill-round').style.width = `${(turnNumber / maxHands) * 100}%`;
+
+        document.getElementById('hud-label-score').textContent = 'Current Score';
+        document.getElementById('hud-val-score').textContent = `${currentScore} PTS`;
+        document.getElementById('hud-fill-score').style.width = `${Math.min(100, (currentScore / targetScore) * 100)}%`;
+
+        document.getElementById('hud-box-target').style.display = 'none';
+      } else {
+        document.getElementById('hud-label-round').textContent = 'Turn Counter';
+        document.getElementById('hud-val-round').textContent = `Turn ${turnNumber}`;
+        document.getElementById('hud-fill-round').style.width = `${(turnNumber / 20) * 100}%`;
+
+        document.getElementById('hud-label-score').textContent = 'Player HP';
+        document.getElementById('hud-val-score').textContent = `${playerHp} / 100`;
+        document.getElementById('hud-fill-score').style.width = `${playerHp}%`;
+
+        document.getElementById('hud-box-target').style.display = 'flex';
+        document.getElementById('hud-val-target-hp').textContent = `${targetHp} / 100`;
+        document.getElementById('hud-fill-target-hp').style.width = `${targetHp}%`;
+      }
+
+      document.getElementById('hud-val-chips').textContent = chips;
+    }
+
+    function log(msg, type = 'normal') {
+      const stream = document.getElementById('log-stream');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = msg;
+      stream.appendChild(entry);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function executeSpin() {
+      if (isSpinning) return;
+
+      const betAmount = parseInt(document.getElementById('chip-amount').value) || 10;
+      if (betAmount > chips) {
+        log('Not enough chips for this bet!', 'loss');
+        return;
+      }
+
+      chips -= betAmount;
+      isSpinning = true;
+      document.getElementById('spin-btn').disabled = true;
+
+      let redBoost = 0;
+      let blackBoost = 0;
+      let doubleDown = false;
+      let rerollOnLoss = false;
+
+      selectedCards.forEach(idx => {
+        const card = hand[idx];
+        log(`Played card: [${card.name}]`, 'card');
+        if (card.id === 'red_fever') redBoost += 0.5;
+        if (card.id === 'black_fever') blackBoost += 0.5;
+        if (card.id === 'double_down') doubleDown = true;
+        if (card.id === 'second_chance') rerollOnLoss = true;
+        if (card.id === 'chip_surge') { chips += 15; log('Gained 15 Chips!', 'card'); }
+        if (card.id === 'green_corruption') slots.push({ number: 0, color: 'Green' });
+        if (card.id === 'jackpot_slot') slots.push({ number: 77, color: 'Gold' });
+        if (card.id === 'red_shift') {
+          slots.forEach(s => { if (s.number >= 1 && s.number <= 12) s.color = 'Red'; });
+        }
+        if (card.id === 'black_shift') {
+          slots.forEach(s => { if (s.number >= 13 && s.number <= 24) s.color = 'Black'; });
+        }
+        if (card.id === 'blood_pact' && currentMode !== 'PointRound') {
+          playerHp = Math.max(0, playerHp - 10);
+          chips += 20;
+          log('Sacrificed 10 HP for 20 Chips!', 'card');
+        }
+        if (card.id === 'greed_pact') {
+          chips += 30;
+          log('Activated Greed Pact: Gained 30 Chips!', 'card');
+        }
+      });
+
+      // Remove played cards and auto-refill hand
+      hand = hand.filter((_, idx) => !selectedCards.has(idx));
+      selectedCards.clear();
+
+      const validPool = cardPool.filter(c => activeDeckIds.has(c.id) && (c.mode === 'all' || c.mode === currentMode));
+      while (hand.length < 4 && validPool.length > 0) {
+        const candidate = validPool[rng.nextU32() % validPool.length];
+        hand.push(candidate);
+      }
+      renderCards();
+
+      const targetSlotIdx = rng.nextU32() % slots.length;
+      const targetSlot = slots[targetSlotIdx];
+      const sliceAngle = (2 * Math.PI) / slots.length;
+      const targetAngle = 3 * Math.PI / 2 - targetSlotIdx * sliceAngle - sliceAngle / 2;
+      const totalRotation = wheelAngle + 6 * Math.PI + (targetAngle - (wheelAngle % (2 * Math.PI)));
+
+      let startTime = null;
+
+      function animateSpin(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const progress = Math.min((timestamp - startTime) / 2000, 1);
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+
+        wheelAngle = wheelAngle + (totalRotation - wheelAngle) * easeOut;
+        drawWheel();
+
+        if (progress < 1) {
+          requestAnimationFrame(animateSpin);
+        } else {
+          document.getElementById('res-number').textContent = targetSlot.number;
+          const colorEl = document.getElementById('res-color');
+          colorEl.textContent = targetSlot.color;
+          colorEl.className = `result-color color-${targetSlot.color.toLowerCase()}`;
+
+          log(`Landed on Number ${targetSlot.number} (${targetSlot.color})`);
+
+          let win = false;
+          if (selectedBetType === 'Red' && targetSlot.color === 'Red') win = true;
+          if (selectedBetType === 'Black' && targetSlot.color === 'Black') win = true;
+          if (selectedBetType === 'Green' && targetSlot.color === 'Green') win = true;
+          if (selectedBetType === 'Even' && targetSlot.number !== 0 && targetSlot.number % 2 === 0) win = true;
+          if (selectedBetType === 'Odd' && targetSlot.number !== 0 && targetSlot.number % 2 !== 0) win = true;
+          if (selectedBetType === 'High' && targetSlot.number >= 19) win = true;
+          if (selectedBetType === 'Low' && targetSlot.number >= 1 && targetSlot.number <= 18) win = true;
+          if (targetSlot.color === 'Gold') win = true; // Gold Jackpot slot wins!
+
+          if (win) {
+            let mult = (selectedBetType === 'Green' ? 14.0 : 2.0);
+            if (targetSlot.color === 'Gold') mult = 50.0;
+            if (targetSlot.color === 'Red') mult += redBoost;
+            if (targetSlot.color === 'Black') mult += blackBoost;
+            if (doubleDown) mult *= 2.0;
+
+            const payout = Math.floor(betAmount * mult);
+            chips += payout;
+            currentScore += payout;
+            targetHp = Math.max(0, targetHp - payout);
+            log(`BET WON! Payout/Score: +${payout} PTS!`, 'win');
+          } else {
+            log(`Bet Lost on ${selectedBetType}.`, 'loss');
+          }
+
+          if (currentMode !== 'PointRound' && targetHp > 0) {
+            const enemyDmg = 15;
+            playerHp = Math.max(0, playerHp - enemyDmg);
+            log(`The Cursed Croupier attacked for ${enemyDmg} HP!`, 'loss');
+          }
+
+          turnNumber++;
+          updateHUD();
+
+          isSpinning = false;
+          document.getElementById('spin-btn').disabled = false;
+
+          checkOutcome();
+        }
+      }
+
+      requestAnimationFrame(animateSpin);
+    }
+
+    function openDeckManager() {
+      const grid = document.getElementById('library-grid');
+      grid.innerHTML = '';
+      cardPool.forEach(card => {
+        const isActive = activeDeckIds.has(card.id);
+        const cardEl = document.createElement('div');
+        cardEl.className = `card-item ${isActive ? 'selected' : ''}`;
+        cardEl.onclick = () => {
+          if (activeDeckIds.has(card.id)) activeDeckIds.delete(card.id);
+          else activeDeckIds.add(card.id);
+          openDeckManager();
+        };
+        cardEl.innerHTML = `
+          <div class="card-header">
+            <span class="card-name">${card.name}</span>
+            <span class="card-cost">${card.cost}</span>
+          </div>
+          <div class="card-desc">${card.desc}</div>
+          <div class="card-badge">${card.type} (${card.mode})</div>
+        `;
+        grid.appendChild(cardEl);
+      });
+      document.getElementById('deck-modal').classList.add('active');
+    }
+
+    function closeDeckManager() {
+      document.getElementById('deck-modal').classList.remove('active');
+      drawNewHand();
+    }
+
+    function checkOutcome() {
+      let title = '', subtitle = '', show = false;
+
+      if (currentMode === 'PointRound') {
+        if (currentScore >= targetScore) {
+          title = 'VICTORY!';
+          subtitle = `Target Score Quota Achieved! Final Score: ${currentScore} PTS`;
+          show = true;
+        } else if (turnNumber > maxHands) {
+          title = 'DEFEAT!';
+          subtitle = `Hand limit reached without meeting target score (${currentScore} / ${targetScore} PTS).`;
+          show = true;
+        }
+      } else {
+        if (targetHp <= 0) {
+          title = 'VICTORY!';
+          subtitle = 'The Cursed Croupier has been defeated!';
+          show = true;
+        } else if (playerHp <= 0) {
+          title = 'DEFEAT!';
+          subtitle = 'You were slain in combat.';
+          show = true;
+        }
+      }
+
+      if (show) {
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-subtitle').textContent = subtitle;
+        document.getElementById('modal').classList.add('active');
+      }
+    }
+
+    function resetEncounter() {
+      document.getElementById('modal').classList.remove('active');
+      turnNumber = 1;
+      currentScore = 0;
+      chips = 50;
+      playerHp = 100;
+      targetHp = 100;
+      selectedCards.clear();
+
+      slots = [{ number: 0, color: 'Green' }];
+      for (let n = 1; n <= 36; n++) {
+        slots.push({ number: n, color: redNumbers.includes(n) ? 'Red' : 'Black' });
+      }
+
+      document.getElementById('log-stream').innerHTML = '<div class="log-entry">New encounter initialized.</div>';
+      init();
+    }
+
+    init();
+  </script>
+</body>
+</html>
