@@ -76,3 +76,16 @@ Principle: *content is data (RON), mechanics are code, seam is a typed EffectKin
 - Landed side effects (§10.2): gold = +15 PTS + gold adjacent + heist; 12 is canonical red (CANONICAL_RED table in wheel/mod.rs) — bet math in tests must use it.
 - Card costs charge before effects (`pay_card_cost` → `on_play_card`); percent gains resolve on the post-cost pool. Played cards sit on `active_played` (the felt) until spin end — never assert discard membership at play time.
 - Status: **142 tests / 0 failures / 0 clippy warnings** across workspace; commit 0664360 on main. Next: Phase 6 (run layer: reward rolls §2.5, progression).
+
+## Phase 6 (GOAL-007) notes — run layer
+- `run/` module: `map.rs`, `state.rs` (RunState + flow API), `rewards.rs`, `shop.rs`, `forge.rs`, `events.rs`.
+- Map gen (§2.3): floor 0 = exactly 3 combat nodes (lanes 0/1/2); middle floors 2–3 nodes, lanes = sorted distinct picks from {0,1,2}; type roll ORDER matters — `floor%4==3` elite, `floor%4==1 && floor>1` shop, else roll 0.2 shop / 0.4 event / 0.55 forge / else combat; last floor = single boss lane 1. Connections: closest-lane next floor ALWAYS + 40% second link when ≤1 lane away; orphan-fix adds a donor edge from the closest-lane prev-floor node (reachability proof = BFS test over 20 seeds).
+- §4.5 level cost is "15 + 5(L−1) (15, 20, 25, …)" with **L = the level being LEFT** — i.e. reaching `target` costs `15 + 5(target−2)`. First upgrade (to 2) = 15. (Blueprint wording is ambiguous; the "(15, 20, 25…)" sequence disambiguates.)
+- RunState per §16.2: `relics: Vec<String>` exists as a placeholder ("field exists; unused in v1" per §16.2 relic note). Chips ⚡ = combat pool AND shop currency (§2.5 shared pool) — `complete_battle` folds `chips_pool` (+ Capital Venture bank) back into `run.chips`; a bankroll above the 30 floor rides IN via `enter_battle` (battle starts at max(30, carried)).
+- Battle fold-back: score defeat with HP>0 → node stays OPEN (retry), `state=Map`; HP==0 → `GameState::GameOver`; boss beaten → `GameState::Victory`. PLAY AGAIN = engine-level `start_new_run` (headless: UI returns to Menu).
+- Shop (§9.1): offer cached per node (`run.shop_offer`), cleared on `complete_node` (RETURN TO PATHS clears cache). Fragile → `RunError::HealingBlocked` for Blood Infusion; heal caps at max_hp (tests must set headroom).
+- Forge (§9.2): `apply_op(wheel, op, green_level, rng)` — destroy_random needs the rng param (≥2-slot rule checked per iteration). Optional payout-multiplier fields bump with defaults gold/purple 4.0, cyan/crimson 6.0.
+- Rewards (§2.5): each pick rolls its own rarity; bands fall down the table when dry; picks dedupe across the set.
+- serde_json added as workspace dep (REQ-009 snapshot/restore on RunState).
+- Nested `pub enum` inside `impl` blocks is illegal Rust — keep such enums at module level (BattleResult pattern).
+- Status: **169 tests / 0 failures / 0 clippy warnings** across workspace; commit 350c34b on main. Next: Phase 7 per PLAN.md (physics integration pass — 120Hz, §13).
