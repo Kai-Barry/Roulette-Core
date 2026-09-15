@@ -1,0 +1,20 @@
+// Events (blueprint §9.4, TASK-011). The event pool ships with THE HOODED
+// SPECTRE; the framework supports N.
+(
+    schema_version: 1,
+    events: [
+        (id: "hooded_spectre", title: "THE HOODED SPECTRE",
+         flavor: "A robed figure offers a deal. Its sleeve smells of ozone and iron.",
+         choices: [
+             (id: "inject_syringe", label: "Inject Syringe",
+              description: "-8 HP, +25 chips",
+              effects: [loss_hp(amount: 8), grant_chips(amount: 25)]),
+             (id: "accept_magnet", label: "Accept Magnet",
+              description: "gain the Lodestone Magnet card (no HP cost)",
+              effects: [grant_card(card_id: "magnetic_force")]),
+             (id: "decline", label: "Decline & Pass",
+              description: "nothing happens",
+              effects: []),
+         ]),
+    ],
+)

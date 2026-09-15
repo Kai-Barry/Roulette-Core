@@ -5,6 +5,7 @@
 //! `docs/ROULETTE_OS_GAME_BLUEPRINT.md` for the normative specifications.
 
 pub mod deterministic_floats;
+pub mod phys;
 pub mod rng;
 
 pub use rng::Rng;

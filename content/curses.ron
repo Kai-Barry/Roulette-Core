@@ -1,0 +1,27 @@
+// Curses (blueprint §8, all 10, TASK-011): run-level debuffs applied randomly
+// on elite and boss floors. They corrupt a tool, not the numbers.
+(
+    schema_version: 1,
+    curses: [
+        (id: "faraday", name: "Faraday", description: "Magnetic cards/cheats disabled (targetZoneBias forced 0).",
+         effect: disable_magnetism),
+        (id: "fog", name: "Fog", description: "No prediction band shown at all.",
+         effect: disable_prediction),
+        (id: "rust", name: "Rust", description: "Friction x2 (wheel stops almost immediately - prediction sectors useless).",
+         effect: friction_multiplier(2.0)),
+        (id: "greed", name: "Greed", description: "Player battle chips pool starts at 15 instead of 30.",
+         effect: chips_pool_override(15)),
+        (id: "avarice", name: "Avarice", description: "Every card draw costs a flat 3 Essence.",
+         effect: flat_draw_cost(3)),
+        (id: "fragile", name: "Fragile", description: "Healing disabled (no heals from gold slots, events, or shop).",
+         effect: disable_healing),
+        (id: "eclipse", name: "Eclipse", description: "Green bets deal 0 (green payouts nullified).",
+         effect: void_green_payouts),
+        (id: "curse_of_blood", name: "Curse of Blood", description: "-2 HP at the start of every round.",
+         effect: hp_loss_per_round(2)),
+        (id: "lead", name: "Lead", description: "Bet slots capped at 5 chips each.",
+         effect: bet_cap(5)),
+        (id: "choked", name: "Choked", description: "Hand limit reduced to 5 cards.",
+         effect: hand_limit_override(5)),
+    ],
+)

@@ -61,6 +61,15 @@ impl Rng {
         (self.next_u32() as f64) / (u32::MAX as f64 + 1.0)
     }
 
+    /// Generates a float in the semi-open range `[min, max)` with 32-bit resolution.
+    /// All sim launch/bounce randomness flows through here (REQ-007: no libm).
+    pub fn range_f64(&mut self, min: f64, max: f64) -> f64 {
+        if min >= max {
+            return min;
+        }
+        min + (max - min) * self.next_f64()
+    }
+
     /// Generates an integer in the inclusive range `[min, max]`.
     ///
     /// # Arguments
