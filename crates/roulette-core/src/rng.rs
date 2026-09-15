@@ -37,9 +37,9 @@ impl Rng {
     /// # Examples
     /// ```rust
     /// use roulette_core::rng::Rng;
-    /// let mut rng = Rng::from_str("combat_seed_101");
+    /// let mut rng = Rng::from_string_seed("combat_seed_101");
     /// ```
-    pub fn from_str(seed: &str) -> Self {
+    pub fn from_string_seed(seed: &str) -> Self {
         let mut hash: u32 = 5381;
         for b in seed.bytes() {
             hash = hash.wrapping_mul(33).wrapping_add(b as u32);
@@ -87,6 +87,38 @@ impl Rng {
     }
 }
 
+impl Rng {
+    /// Derives an independent child stream labeled `label` from this generator.
+    ///
+    /// Uses djb2 over the current state rendered as a decimal string concatenated
+    /// with `label`, so sibling streams never share sequences.
+    pub fn derive(&self, label: &str) -> Rng {
+        let mut hash: u32 = 5381;
+        let state_text = self.state.to_string();
+        for b in state_text.bytes().chain(label.bytes()) {
+            hash = hash.wrapping_mul(33).wrapping_add(b as u32);
+        }
+        Rng::new(hash)
+    }
+
+    /// Generates a `usize` in the inclusive range `[min, max]`.
+    pub fn range_usize(&mut self, min: usize, max: usize) -> usize {
+        if min >= max {
+            return min;
+        }
+        let range = (max - min + 1) as u32;
+        min + (self.next_u32() % range) as usize
+    }
+
+    /// Picks a random element from a slice, or `None` when empty.
+    pub fn pick<'a, T>(&mut self, items: &'a [T]) -> Option<&'a T> {
+        if items.is_empty() {
+            return None;
+        }
+        Some(&items[self.range_usize(0, items.len() - 1)])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,8 +135,56 @@ mod tests {
 
     #[test]
     fn test_string_seed_consistency() {
-        let mut rng1 = Rng::from_str("test_seed");
-        let mut rng2 = Rng::from_str("test_seed");
+        let mut rng1 = Rng::from_string_seed("test_seed");
+        let mut rng2 = Rng::from_string_seed("test_seed");
         assert_eq!(rng1.next_u32(), rng2.next_u32());
+    }
+
+    #[test]
+    fn test_derive_streams_independent() {
+        let root = Rng::from_string_seed("match_seed_402");
+
+        // Same label reproduces the same stream; different labels diverge.
+        let mut a = root.derive("wheel");
+        let mut a_again = Rng::from_string_seed("match_seed_402").derive("wheel");
+        let mut b = root.derive("deck");
+        for _ in 0..32 {
+            let va = a.next_u32();
+            let vb = b.next_u32();
+            assert_eq!(va, a_again.next_u32());
+            assert_ne!(va, vb);
+        }
+
+        // Derived streams differ from the raw root stream.
+        let mut root_copy = root.clone();
+        let mut c = root.derive("wheel");
+        let mut hits = 0;
+        for _ in 0..16 {
+            if root_copy.next_u32() == c.next_u32() {
+                hits += 1;
+            }
+        }
+        assert!(hits <= 1, "derived stream must not mirror root stream");
+    }
+
+    #[test]
+    fn test_range_usize_bounds() {
+        let mut rng = Rng::new(7);
+        for _ in 0..1000 {
+            let v = rng.range_usize(3, 7);
+            assert!((3..=7).contains(&v));
+        }
+        assert_eq!(rng.range_usize(5, 5), 5);
+    }
+
+    #[test]
+    fn test_pick() {
+        let mut rng = Rng::new(9);
+        let items = [10u32, 20, 30];
+        for _ in 0..100 {
+            assert!(items.contains(rng.pick(&items).unwrap()));
+        }
+        let empty: [u32; 0] = [];
+        assert!(rng.pick(&empty).is_none());
     }
 }

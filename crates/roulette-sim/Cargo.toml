@@ -1,0 +1,22 @@
+[package]
+name = "roulette-sim"
+description = "Monte Carlo battle simulator and card EV balancer (blueprint §15)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "simulate"
+path = "src/bin/simulate.rs"
+
+[[bin]]
+name = "balance"
+path = "src/bin/balance.rs"
+
+[dependencies]
+roulette-core = { path = "../roulette-core" }
+roulette-content = { path = "../roulette-content" }
+
+[lints]
+workspace = true

@@ -1,0 +1,17 @@
+[package]
+name = "roulette-core"
+description = "Headless deterministic engine core for Roulette.OS"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest = "1"
+
+[lints]
+workspace = true
