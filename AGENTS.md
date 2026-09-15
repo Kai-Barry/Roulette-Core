@@ -35,8 +35,10 @@ Principle: *content is data (RON), mechanics are code, seam is a typed EffectKin
   See `docs/DECISIONS.md`. Test: `prediction_never_matches_with_certainty`.
 - Elite `dealers_claw` difficulty fixed 0.6 → 0.85 (blueprint §14.2).
 - Validator rejects non-finite payouts (RON parses `NaN`; `x <= 0.0` is false for NaN).
-- Open: F3 (score pool semantics — pin before Phase 4), F2 (special-color bet
-  dominance — fix in Phase 3), F4 (enemy max_hp vestigial in points mode).
+- Open: F3 (score pool semantics — pin before Phase 5), F4 (enemy max_hp
+  vestigial in points mode). F2 fixed in Phase 3 (color dominance via
+  effective-color resolution). F3 resolved for Phase 4: in points mode the
+  score IS the chip pool (§10.4 payouts return to the pool).
 
 ## Phase 2 (GOAL-003) notes
 - Constants live verbatim in blueprint §5.1/§5.2; do not restate — cite sections.
@@ -45,3 +47,20 @@ Principle: *content is data (RON), mechanics are code, seam is a typed EffectKin
   substreams must stay independent (DEC-001).
 - Wheel layouts come from `roulette-content` `WheelDef`; sim is headless with
   `run_to_completion()` (step cap 7200) and emits `SimEvent`s.
+## Phase 4 (GOAL-005) notes
+- Pipeline contract: `resolve_spin(SpinInput)` is the single §10.1 entry; board
+  base = battle-owned `player_board` clone, then `player_stack.fold_into(&mut
+  board)` (converts after paints). Persist the mutated board back post-spin.
+- Streak multiplier applies on the current spin from prior count; HEAT COMBO /
+  GLACIER SHIELD arm when count reaches ≥3 (§10.3).
+- Spin side-effect PTS (GOLD/PURPLE/CYAN/CRIMSON consolation, zone triggers)
+  fold into spin payout; score == pool in points mode.
+- LUCKY_CHARM is a policy query (`should_use_lucky_charm`/`consume_lucky_charm`);
+  the orchestrator re-spins + re-resolves. Insurance refunds full stake on
+  all-lost spin (§10.5).
+- Enemy: `enemy_choose_bets` EV enumeration (optimal with p=difficulty, else
+  random valid bet), ~50/30/rest split, comeback risk scaling; intents execute
+  only on a winning enemy spin (§7.3); stuns skip turns.
+- Round end: `end_round()` ticks Round-scope modifiers, applies Curse of Blood,
+  compares pools at the limit; tie → sudden death extra rounds.
+- Reward rolls (§2.5) deferred to run layer (Phase 6).
