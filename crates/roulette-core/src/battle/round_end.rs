@@ -30,6 +30,10 @@ impl BattleState {
     /// Curse of Blood, advance the round, and evaluate the outcome. Sudden
     /// death grants one extra round per tie (§3.5).
     pub fn end_round(&mut self) -> BattleOutcome {
+        // OnRoundEnd hook (§6.4): Capital Venture pays on a round win and the
+        // round's played cards are filed (temp cards exiled).
+        crate::cards::effects::on_round_end(self, self.chips_pool > self.enemy_chips_pool);
+
         // Tick Fight-scope modifiers at the round boundary.
         self.player_stack.tick_at_round_end();
 

@@ -7,6 +7,7 @@
 pub mod battle;
 pub mod bets;
 pub mod board;
+pub mod cards;
 pub mod deterministic_floats;
 pub mod phys;
 pub mod rng;

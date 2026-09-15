@@ -62,7 +62,7 @@ impl From<PayoutTarget> for MultTarget {
 pub enum ModifierScope {
     /// Until the fight ends.
     Fight,
-    /// Expires after `n` spins (tick_at_round_end).
+    /// Expires after `n` spins (tick_after_spin).
     Spins(u8),
     /// Until the end of the current round (paint cards).
     Round,
@@ -162,6 +162,8 @@ pub struct BoardModifiers {
     pub insurance_active: bool,
     pub risk_capital_active: bool,
     pub risk_capital_drain: u16,
+    /// Capital Venture: ⚡ banked at round end on a win, then consumed (§6.3).
+    pub capital_venture_amount: u16,
     pub golden_heist_active: bool,
     pub golden_heist_amount: u16,
     pub emerald_forest_active: bool,
@@ -237,16 +239,20 @@ impl ModifierStack {
         &self.entries
     }
 
+    /// Mutable access for battle-layer one-shot consumption (insurance).
+    pub fn entries_mut(&mut self) -> &mut Vec<ModifierEntry> {
+        &mut self.entries
+    }
+
     /// Pushes a resolved modifier entry.
     pub fn push(&mut self, entry: ModifierEntry) {
         self.entries.push(entry);
     }
 
-    /// Removes every entry whose scope has ended by the end of a round:
-    /// `Spins(n)` counts down (removing at 0), `Round`-scoped entries clear.
-    pub fn tick_at_round_end(&mut self) {
+    /// Ticks one spin: `Spins(n)` counts down per spin resolution (§6.3
+    /// "next N spins"); round/fight entries are unaffected.
+    pub fn tick_after_spin(&mut self) {
         self.entries.retain_mut(|entry| match entry.scope {
-            ModifierScope::Round => false,
             ModifierScope::Spins(n) => {
                 if n <= 1 {
                     false
@@ -257,6 +263,12 @@ impl ModifierStack {
             }
             _ => true,
         });
+    }
+
+    /// Round-scoped entries clear at round end; `Spins(n)` ticks per spin
+    /// (`tick_after_spin`), not here.
+    pub fn tick_at_round_end(&mut self) {
+        self.entries.retain(|entry| !matches!(entry.scope, ModifierScope::Round));
     }
 
     /// Removes spin-scoped entries (`Spin`/`NextWin`); called at spin

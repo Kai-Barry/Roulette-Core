@@ -476,7 +476,7 @@ fn stack_snapshot_folds_entries_into_board_state() {
 }
 
 #[test]
-fn stack_tick_at_round_end_expires_spins_and_rounds() {
+fn stack_tick_expires_spins_per_spin_and_rounds_per_round() {
     let mut stack = ModifierStack::new();
     stack.push(ModifierEntry {
         source: "greed".into(),
@@ -497,14 +497,15 @@ fn stack_tick_at_round_end_expires_spins_and_rounds() {
         scope: ModifierScope::Fight,
     });
 
-    stack.tick_at_round_end(); // 3→2, Round cleared
+    stack.tick_at_round_end(); // Round cleared; Spins counts per-spin
     assert_eq!(stack.len(), 2);
     let board = stack.snapshot();
     assert!(board.paints.is_empty());
     assert!(board.golden_heist_active);
 
-    stack.tick_at_round_end(); // 2→1
-    stack.tick_at_round_end(); // expired
+    stack.tick_after_spin(); // 3→2
+    stack.tick_after_spin(); // 2→1
+    stack.tick_after_spin(); // expired
     assert_eq!(stack.len(), 1);
     assert_eq!(stack.entries()[0].source, "heist");
     // Payout mult query folds only live entries.
@@ -557,8 +558,8 @@ fn custom_number_multipliers_fold_and_scope() {
     // 7 gets both; 6 gets only the trio.
     assert!((board.custom_number_multipliers[&7] - 50_000.0).abs() < 1e-3);
     assert!((board.custom_number_multipliers[&6] - 250.0).abs() < 1e-3);
-    stack.tick_at_round_end(); // 2→1
-    stack.tick_at_round_end(); // lucky_seven expires
+    stack.tick_after_spin(); // 2→1
+    stack.tick_after_spin(); // lucky_seven expires
     let board = stack.snapshot();
     assert!((board.custom_number_multipliers[&7] - 250.0).abs() < 1e-3);
 }

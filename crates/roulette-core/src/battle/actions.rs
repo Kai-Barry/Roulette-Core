@@ -209,6 +209,7 @@ impl BattleState {
     }
 
     /// Re-arms a fresh betting phase after a resolution (turn flow §3.2).
+    /// Banked free-card credits from last turn become active.
     pub fn begin_betting(&mut self, side: Side) {
         self.turn = side;
         self.phase = BattlePhase::Betting;
@@ -216,5 +217,20 @@ impl BattleState {
         self.draws_this_turn = 0;
         self.damage_this_turn = 0;
         self.turn_start_pool = self.pool(side);
+        if side == Side::Player {
+            self.free_cards_active += self.free_cards_next_turn;
+            self.free_cards_next_turn = 0;
+        }
+    }
+
+    /// Resets the spin-scoped physics cheats to the run baseline, with curse
+    /// overlays (Rust: friction ×2, §8).
+    pub fn reset_physics(&mut self) {
+        self.physics = self.physics_baseline.clone();
+        for curse in &self.curses {
+            if let roulette_content::schema::CurseEffect::FrictionMultiplier(m) = curse.effect {
+                self.physics.friction *= m;
+            }
+        }
     }
 }

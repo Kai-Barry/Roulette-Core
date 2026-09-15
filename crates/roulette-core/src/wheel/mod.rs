@@ -214,7 +214,14 @@ impl WheelConfig {
         };
         let painted = board.color_of_converted(number, false);
         let converted = board.color_of_converted(number, true);
-        converted.or(painted).unwrap_or(base)
+        let final_color = converted.or(painted).unwrap_or(base);
+        // Monochrome swap (§6.3): red ↔ black after every other layer; green
+        // and specials are unaffected.
+        match (board.swap_red_black, final_color) {
+            (true, SlotColor::Red) => SlotColor::Black,
+            (true, SlotColor::Black) => SlotColor::Red,
+            _ => final_color,
+        }
     }
 
     /// Applies the §4.4 ladder for a green level-up: extra green numbers join

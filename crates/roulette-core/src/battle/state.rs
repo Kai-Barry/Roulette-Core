@@ -38,6 +38,16 @@ pub struct CardInstance {
     /// Player-chosen slots resolved at play time (paint cards).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub marked_slots: Vec<u32>,
+    /// Temp cards (essence chips, clones) are exiled after play instead of
+    /// discarded (§6.3 money cards).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub temp: bool,
+    /// Retain Vision: stays in hand permanently.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub retained: bool,
+    /// Golden Mirror clones play for 0 ⚡.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_override: Option<u8>,
 }
 
 /// A card played face-up on the felt (§3.2: locked while a temp effect runs).
@@ -179,6 +189,14 @@ pub struct BattleState {
     pub player_board: BoardModifiers,
     pub enemy_board: BoardModifiers,
     pub physics: PhysicsModifiers,
+    /// Run-baseline physics the per-spin arms reset to after each resolve
+    /// (cheats are spin-scoped; run-level mods and curses overlay here).
+    #[serde(default = "crate::phys::modifiers::PhysicsModifiers::default")]
+    pub physics_baseline: PhysicsModifiers,
+    /// Capital Venture bank: ⚡ granted on round wins, drained by the run
+    /// layer at battle end (§6.3 money_venture).
+    #[serde(default)]
+    pub venture_bank: u16,
     /// CYAN refill backup (§10.2: pool refilled to turn-start value).
     pub turn_start_pool: u16,
 
@@ -216,6 +234,20 @@ pub enum ActionError {
     /// Lead curse: single bet slot cap exceeded.
     BetCapExceeded(u16),
     InvalidBet(String),
+}
+impl std::fmt::Display for ActionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ActionError::NotEnoughChips => write!(f, "not enough chips"),
+            ActionError::NotYourTurn => write!(f, "not your turn"),
+            ActionError::HandFull => write!(f, "hand is full"),
+            ActionError::NoBetToRemove => write!(f, "no bet to remove"),
+            ActionError::NoCardAt(i) => write!(f, "no card at hand index {i}"),
+            ActionError::EmptyDrawPileAndDiscard => write!(f, "draw pile and discard both empty"),
+            ActionError::BetCapExceeded(cap) => write!(f, "bet exceeds lead cap of {cap}"),
+            ActionError::InvalidBet(why) => write!(f, "invalid bet: {why}"),
+        }
+    }
 }
 
 impl BattleState {
@@ -270,6 +302,8 @@ impl BattleState {
             player_board: BoardModifiers::default(),
             enemy_board: BoardModifiers::default(),
             physics: PhysicsModifiers::default(),
+            physics_baseline: PhysicsModifiers::default(),
+            venture_bank: 0,
             turn_start_pool: start_pool,
             curses,
             enemy_intent: None,
@@ -288,7 +322,7 @@ impl BattleState {
     pub fn deal_from_defs(&mut self, defs: &[CardDef], rng: &mut crate::rng::Rng) {
         self.draw_pile = defs
             .iter()
-            .map(|d| CardInstance { def_id: d.id.clone(), marked_slots: Vec::new() })
+            .map(|d| CardInstance { def_id: d.id.clone(), marked_slots: Vec::new(), temp: false, retained: false, cost_override: None })
             .collect();
         rng.shuffle(&mut self.draw_pile);
         self.discard_pile.clear();

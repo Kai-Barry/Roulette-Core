@@ -134,6 +134,12 @@ impl BattleState {
         if all_lost && board.insurance_active {
             insurance_refund = stake;
             board.insurance_active = false;
+            // The armed Insurance stack entry is consumed with its payout.
+            if side == Side::Player {
+                self.player_stack
+                    .entries_mut()
+                    .retain(|e| !matches!(e.kind, crate::board::ModifierKind::Insurance));
+            }
         }
         // Block-red intent is spent on the spin it guarded (§7.2).
         if side == Side::Player && board.block_red_active {
@@ -171,6 +177,11 @@ impl BattleState {
         if side == Side::Player {
             self.damage_this_turn = self.damage_this_turn.saturating_add(total_payout);
         }
+        // Risk Capital drain (§6.3): −⚡ per spin while armed.
+        if board.risk_capital_active && board.risk_capital_drain > 0 {
+            let drain = board.risk_capital_drain.min(*self.pool_mut(side));
+            *self.pool_mut(side) -= drain;
+        }
         // Stuns from purple/cursed/strike land on the opponent (§7.3).
         if target_stunned > 0 {
             match side {
@@ -195,10 +206,32 @@ impl BattleState {
                 if board.red_streak_count >= 3 {
                     let l = levels.get(SlotColor::Red);
                     let heat = 3.5 + 0.5 * l.saturating_sub(1) as f32;
-                    board.payout_multipliers.insert(crate::board::MultTarget::Red, heat);
+                    // Battle-owned: survives the fold (applies to future spins).
+                    match side {
+                        Side::Player => {
+                            self.player_board
+                                .payout_multipliers
+                                .insert(crate::board::MultTarget::Red, heat);
+                            board.payout_multipliers.insert(crate::board::MultTarget::Red, heat);
+                        }
+                        Side::Enemy => {
+                            self.enemy_board
+                                .payout_multipliers
+                                .insert(crate::board::MultTarget::Red, heat);
+                        }
+                    }
                 }
             } else {
                 board.red_streak_count = 0;
+                // Streak gone: the heat multiplier reverts to the base.
+                match side {
+                    Side::Player => {
+                        self.player_board.payout_multipliers.remove(&crate::board::MultTarget::Red);
+                    }
+                    Side::Enemy => {
+                        self.enemy_board.payout_multipliers.remove(&crate::board::MultTarget::Red);
+                    }
+                }
             }
         }
         if board.black_streak_active {
@@ -219,9 +252,23 @@ impl BattleState {
             }
         }
 
-        // Persist battle-owned board state (streaks, consumed one-shots).
+        // Persist battle-owned board state only. The folded snapshot carries
+        // stack-derived values (card arms) that live on in the stack — writing
+        // them back would double-apply on the next spin.
+        let streaks = (board.red_streak_active, board.red_streak_count, board.black_streak_active, board.black_streak_count);
         match side {
-            Side::Player => self.player_board = board,
+            Side::Player => {
+                let pb = &mut self.player_board;
+                pb.red_streak_active = streaks.0;
+                pb.red_streak_count = streaks.1;
+                pb.black_streak_active = streaks.2;
+                pb.black_streak_count = streaks.3;
+                pb.block_red_active = board.block_red_active;
+                pb.stun_strike_armed = board.stun_strike_armed;
+                pb.heavy_nudge_armed = board.heavy_nudge_armed;
+                pb.insurance_active = board.insurance_active;
+                pb.double_next_payout = board.double_next_payout;
+            }
             Side::Enemy => self.enemy_board = board,
         }
 
@@ -244,6 +291,11 @@ impl BattleState {
         };
         self.last_spin_result = Some(outcome.clone());
         self.phase = BattlePhase::Resolved;
+        // AfterSpinResolve hook (§6.4): played cards file to the discard pile
+        // (temp cards exiled), per-spin arms expire, physics resets.
+        if side == Side::Player {
+            crate::cards::effects::after_spin_resolve(self);
+        }
         outcome
     }
 
@@ -272,8 +324,20 @@ impl BattleState {
             if let Some(custom) = board.custom_number_multipliers.get(&n) {
                 mult = *custom;
             }
-            // Card-armed single-number boosts fold on top.
+            // Card-armed single-number boosts fold on top: exact number, the
+            // single-number family arm (SINGLE_OUT), and the High/Low/Prime
+            // zone arms when the number qualifies (§10.1 step 3).
             mult *= board.payout_multiplier_for(&MultTarget::Number(n));
+            mult *= board.payout_multiplier_for(&MultTarget::SingleNumber);
+            if (1..=18).contains(&n) {
+                mult *= board.payout_multiplier_for(&MultTarget::Low);
+            }
+            if (19..=36).contains(&n) {
+                mult *= board.payout_multiplier_for(&MultTarget::High);
+            }
+            if crate::cards::effects::is_prime(n) {
+                mult *= board.payout_multiplier_for(&MultTarget::Prime);
+            }
         }
         match bt {
             BetType::Red => mult *= board.payout_multiplier_for(&MultTarget::Red),
@@ -291,6 +355,8 @@ impl BattleState {
                         payout: 0.0,
                     });
                 }
+                // Card-armed green multiplier folds with the base (§10.1).
+                mult *= board.payout_multiplier_for(&MultTarget::Green);
                 // Emerald Forest doubles the green multiplier (§10.1).
                 if board.emerald_forest_active {
                     mult *= 2.0;
@@ -318,10 +384,16 @@ impl BattleState {
         landed: u32,
         levels: &ColorLevels,
     ) -> (u16, u16) {
+        // Folded snapshot so stack-armed effects (Golden Heist) are visible.
+        let board = if side == Side::Player {
+            self.merged_board(side)
+        } else {
+            self.board_for(side).clone()
+        };
         let color = self.wheel(side).effective_color(
             landed,
             levels.get(SlotColor::Green),
-            Some(self.board_for(side)),
+            Some(&board),
         );
         let level = |levels: &ColorLevels, c: SlotColor| levels.get(c);
         let mut pts = 0u16;
@@ -339,8 +411,8 @@ impl BattleState {
                 if let Some(next) = adjacent {
                     self.wheel_mut(side).set_slot_color(next, SlotColor::Gold);
                 }
-                if self.board_for(side).golden_heist_active {
-                    *self.pool_mut(side) += self.board_for(side).golden_heist_amount;
+                if board.golden_heist_active {
+                    *self.pool_mut(side) += board.golden_heist_amount;
                 }
             }
             SlotColor::Purple => {
@@ -377,7 +449,13 @@ impl BattleState {
 
     /// §10.4 zone triggers for a landed ball; returns HP healed.
     fn apply_zone_triggers(&mut self, side: Side, landed: u32) -> u16 {
-        let board = self.board_for(side).clone();
+        // The folded snapshot (stack + battle-owned) is authoritative: zone
+        // marks armed through the card stack must trigger (§10.4).
+        let board = if side == Side::Player {
+            self.merged_board(side)
+        } else {
+            self.board_for(side).clone()
+        };
         let mut healed = 0u16;
         if let Some(mine) = board.zone(ZoneKind::ChipMine) {
             if mine.contains(&landed) {
@@ -430,7 +508,7 @@ impl BattleState {
     /// Board state used by the pipeline: battle-owned state as the base, then
     /// the player's modifier stack folded on top (card arms). Enemy: plain
     /// board (intents may arm flags).
-    fn merged_board(&self, side: Side) -> crate::board::BoardModifiers {
+    pub fn merged_board(&self, side: Side) -> crate::board::BoardModifiers {
         match side {
             Side::Player => {
                 let mut board = self.player_board.clone();

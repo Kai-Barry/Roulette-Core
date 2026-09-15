@@ -312,6 +312,16 @@ pub enum EffectKind {
     TempEssenceChips { count: u8, destination: ChipDestination },
     /// Adrenaline-style +actions/+essence burst.
     ActionSurge { chips: u16 },
+    /// Free card plays / next-turn free draws (EMP, Adrenaline Rush).
+    FreeCards { this_turn: u8, next_turn: u8 },
+    /// Omniscience: ×3 when the ball lands in the prediction sector.
+    Omniscience,
+    /// Turbo Spin: ×1.5 on the next spin's wins.
+    TurboSpin,
+    /// Heavy Nudge: all-zero spin → +chips consolation.
+    HeavyNudge,
+    /// Chips granted as a percentage of the current pool (Compound Interest).
+    GrantChipsPercent { percent: u16 },
     /// Grant a card by id (events).
     GrantCard { card_id: String },
 }
