@@ -360,6 +360,21 @@ impl Simulator {
         (all_events, result)
     }
 
+    /// Uniform fast path (§15/TASK-045): samples each ball's slot uniformly
+    /// with zero sim steps. Statistically equivalent to a fair-physics spin
+    /// for bulk Monte Carlo runs; ignores cheat hooks (physics cards are
+    /// excluded from repricing per §15.2). Deterministic via the same live
+    /// stream the physics path consumes.
+    pub fn uniform_run(
+        layout: &WheelLayout,
+        ball_count: u32,
+        mut rng: crate::rng::Rng,
+    ) -> (Vec<SimEvent>, SpinResult) {
+        let last = layout.numbers.len().saturating_sub(1);
+        let slots = (0..ball_count.max(1)).map(|_| rng.range_usize(0, last)).collect();
+        (Vec::new(), SpinResult { slots, steps: 0 })
+    }
+
     /// Prediction dry-run (§10.6, DEC-001).
     ///
     /// Two RNG streams flow in: `live_rng` is the *master* stream the live spin will

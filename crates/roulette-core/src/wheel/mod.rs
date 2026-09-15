@@ -202,7 +202,12 @@ impl WheelConfig {
             canonical_color(number)
         };
         // Ladder greens only claim plain red/black slots (§4.4).
-        let base = if base != SlotColor::Green && green_ladder_slots(green_level).contains(&number)
+        let base = if base != SlotColor::Green
+            && !matches!(
+                base,
+                SlotColor::Gold | SlotColor::Purple | SlotColor::Cyan | SlotColor::Crimson
+            )
+            && green_ladder_slots(green_level).contains(&number)
         {
             SlotColor::Green
         } else {

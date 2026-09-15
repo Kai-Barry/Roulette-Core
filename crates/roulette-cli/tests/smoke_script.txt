@@ -1,0 +1,23 @@
+start
+draft 0
+draft 1
+draft 2
+draft 3
+draft 4
+wheel
+done
+pick f0l0
+play 0
+bet red 10
+spin
+bet red 10
+spin
+bet red 10
+spin
+pick f1l1
+bet red 10
+spin
+bet red 10
+spin
+events 3
+quit

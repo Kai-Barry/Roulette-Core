@@ -116,6 +116,17 @@ struct EngineSnapshot {
 /// Undo-stack depth cap (cheap Clone-based snapshots, REQ-009).
 const UNDO_DEPTH: usize = 64;
 
+/// Spin sampling mode for the §15 Monte Carlo tooling (TASK-045).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SpinSampling {
+    /// Real 120 Hz deterministic physics simulation (REQ-002). Default.
+    #[default]
+    Physics,
+    /// Uniform slot sampling with zero sim steps — statistically equivalent
+    /// for bulk balance runs. Prediction is unavailable in this mode.
+    Uniform,
+}
+
 /// Headless engine facade over the run + battle layers (TASK-042).
 pub struct Engine {
     pub(crate) content: Arc<roulette_content::schema::Content>,
@@ -123,6 +134,11 @@ pub struct Engine {
     run: Option<crate::run::state::RunState>,
     battle: Option<BattleState>,
     prediction: Option<(usize, u8)>,
+    /// Spin sampling mode (§15 tooling): `Physics` (default) runs the real
+    /// 120 Hz sim; `Uniform` draws each ball's slot uniformly with zero sim
+    /// steps — statistically equivalent for bulk Monte Carlo balance runs.
+    /// Prediction is unavailable in `Uniform` mode (no dry-run exists).
+    spin_sampling: SpinSampling,
     /// §4.8 customizer draft wheel (None unless a Customize session is open).
     draft_wheel: Option<crate::wheel::WheelConfig>,
     /// Label counters — every RNG child stream is derived by a deterministic
@@ -146,6 +162,7 @@ impl Engine {
             run: None,
             battle: None,
             prediction: None,
+            spin_sampling: SpinSampling::Physics,
             draft_wheel: None,
             spin_index: 0,
             battle_index: 0,
@@ -173,6 +190,15 @@ impl Engine {
 
     pub fn undo_depth(&self) -> usize {
         self.undo.len()
+    }
+
+    /// Selects the spin sampling mode (§15 tooling; default `Physics`).
+    pub fn set_spin_sampling(&mut self, mode: SpinSampling) {
+        self.spin_sampling = mode;
+    }
+
+    pub fn spin_sampling(&self) -> SpinSampling {
+        self.spin_sampling
     }
 
     // -- command dispatch ----------------------------------------------------
@@ -631,6 +657,10 @@ impl Engine {
     }
 
     fn predict(&mut self) -> Result<(), EngineError> {
+        if self.spin_sampling == SpinSampling::Uniform {
+            // No dry-run exists on the uniform fast path (§15 tooling mode).
+            return Err(EngineError::PredictionUnavailable);
+        }
         let battle = self.battle.as_ref().ok_or(EngineError::NotInBattle)?;
         if !battle.prediction_allowed() {
             return Err(EngineError::PredictionBlocked);
@@ -673,7 +703,12 @@ impl Engine {
             let nudge = (mods.nudge_cheat_active && mods.nudge_distance > 0)
                 .then_some(mods.nudge_distance as i32);
             let battle = self.battle.as_mut().ok_or(EngineError::NotInBattle)?;
-            let (_, result) = Simulator::new(layout.clone(), mods, live).run_to_completion(nudge);
+            let (_, result) = if self.spin_sampling == SpinSampling::Uniform {
+                let balls = mods.ball_count();
+                Simulator::uniform_run(&layout, balls, live)
+            } else {
+                Simulator::new(layout.clone(), mods, live).run_to_completion(nudge)
+            };
             for &slot in &result.slots {
                 events.push(EngineEvent::BallLanded {
                     side: crate::battle::state::Side::Player,
@@ -701,7 +736,12 @@ impl Engine {
             let layout = self.enemy_layout(battle);
             let mods = PhysicsModifiers::default();
             let live = self.run_rng().derive(&format!("spin:{}:enemy", self.spin_index));
-            let (_, result) = Simulator::new(layout.clone(), mods, live).run_to_completion(None);
+            let (_, result) = if self.spin_sampling == SpinSampling::Uniform {
+                let balls = mods.ball_count();
+                Simulator::uniform_run(&layout, balls, live)
+            } else {
+                Simulator::new(layout.clone(), mods, live).run_to_completion(None)
+            };
             for &slot in &result.slots {
                 events.push(EngineEvent::BallLanded {
                     side: crate::battle::state::Side::Enemy,
@@ -732,8 +772,11 @@ impl Engine {
         });
         match outcome {
             BattleOutcome::InProgress | BattleOutcome::SuddenDeath => {
-                let battle = self.battle.as_mut().ok_or(EngineError::NotInBattle)?;
-                battle.advance_after_spin();
+                // Turn handoff is already complete: advance #2 (after the
+                // enemy's spin) returns the turn to the player for the next
+                // betting phase (§3.2). An extra advance here would leave
+                // round N+1 in the enemy's betting phase and stall all
+                // command-driven multi-round battles.
                 self.events.append(&mut events);
                 Ok(())
             }

@@ -16,24 +16,114 @@ use roulette_core::run::state::{Difficulty, GameState};
 const DEFAULT_SEED: &str = "damned";
 const CONTENT_DIR: &str = "content";
 
+/// Built-in demo script for `--non-interactive` (TASK-043): a complete
+/// loadout → combat sequence; every command is deterministic for a seed.
+const DEMO_SCRIPT: &[&str] = &[
+    "start",
+    "draft 0",
+    "draft 1",
+    "draft 2",
+    "draft 3",
+    "draft 4",
+    "wheel",
+    "done",
+    "pick f0l0",
+    "bet red 10",
+    "spin",
+    "bet red 10",
+    "spin",
+    "bet red 10",
+    "spin",
+    "pick f1l1",
+    "bet red 10",
+    "spin",
+    "bet red 10",
+    "spin",
+    "quit",
+];
+
+struct Args {
+    seed: String,
+    script: Option<String>,
+    non_interactive: bool,
+}
+
+fn parse_args() -> Result<Args, String> {
+    let mut seed: Option<String> = None;
+    let mut script = None;
+    let mut non_interactive = false;
+    let mut it = std::env::args().skip(1);
+    while let Some(arg) = it.next() {
+        match arg.as_str() {
+            "--seed" => {
+                seed = Some(it.next().ok_or("--seed requires a value")?);
+            }
+            "--script" => {
+                script = Some(it.next().ok_or("--script requires a path")?);
+            }
+            "--non-interactive" => non_interactive = true,
+            "--help" | "-h" => {
+                println!(
+                    "usage: roulette [--seed <seed>] [--script <file>] [--non-interactive]\n\
+                     seed defaults to {DEFAULT_SEED}; --script feeds a command file;\n\
+                     --non-interactive runs the built-in demo script and exits."
+                );
+                std::process::exit(0);
+            }
+            other => {
+                if seed.is_none() && !other.starts_with('-') {
+                    seed = Some(other.to_string());
+                } else {
+                    return Err(format!("unknown argument `{other}` (try --help)"));
+                }
+            }
+        }
+    }
+    Ok(Args { seed: seed.unwrap_or_else(|| DEFAULT_SEED.to_string()), script, non_interactive })
+}
+
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let seed = args.next().unwrap_or_else(|| DEFAULT_SEED.to_string());
+    let args = parse_args().unwrap_or_else(|e| {
+        eprintln!("✗ {e}");
+        std::process::exit(2);
+    });
 
     let content = match Content::load_dir(CONTENT_DIR) {
         Ok(c) => c,
         Err(_) => Content::embedded().expect("embedded content validates"),
     };
-    let engine = Engine::new(Arc::new(content.clone()), &seed);
-    println!("Roulette.OS — Roulette of the Damned (terminal)");
-    println!("seed: {seed} | type `help` for commands\n");
+    let engine = Engine::new(Arc::new(content.clone()), &args.seed);
+    if !args.non_interactive {
+        println!("Roulette.OS — Roulette of the Damned (terminal)");
+        println!("seed: {} | type `help` for commands\n", args.seed);
+    }
 
-    let stdin = std::io::stdin();
     let mut cli = Cli { engine, content };
-    for line in stdin.lock().lines() {
-        let Ok(line) = line else { break };
-        if !cli.execute(&line) {
-            break;
+    match &args.script {
+        Some(path) => {
+            let text = std::fs::read_to_string(path)
+                .unwrap_or_else(|e| panic!("cannot read script {path}: {e}"));
+            for line in text.lines() {
+                if !cli.execute(line) {
+                    break;
+                }
+            }
+        }
+        None if args.non_interactive => {
+            for line in DEMO_SCRIPT.iter().copied() {
+                if !cli.execute(line) {
+                    break;
+                }
+            }
+        }
+        None => {
+            let stdin = std::io::stdin();
+            for line in stdin.lock().lines() {
+                let Ok(line) = line else { break };
+                if !cli.execute(&line) {
+                    break;
+                }
+            }
         }
     }
 }
