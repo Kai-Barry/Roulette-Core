@@ -20,7 +20,11 @@ pub fn format_description(text: &str, mode: CombatMode) -> String {
 fn rewrite_points(text: &str) -> String {
     let mut t = text.to_string();
     // 1. "incoming enemy damage" → "incoming opponent points".
-    t = replace_phrase_ci(&t, &["incoming", "enemy", "damage"], &["incoming", "opponent", "points"]);
+    t = replace_phrase_ci(
+        &t,
+        &["incoming", "enemy", "damage"],
+        &["incoming", "opponent", "points"],
+    );
     // 2. "enemy damage" / "opponent damage" → "opponent points".
     t = replace_phrase_ci(&t, &["enemy", "damage"], &["opponent", "points"]);
     t = replace_phrase_ci(&t, &["opponent", "damage"], &["opponent", "points"]);

@@ -212,7 +212,9 @@ fn apply_effect(
             discard_hand(state);
             state.draw_free(n);
         }
-        EffectKind::GrantChips { amount } => state.chips_pool = state.chips_pool.saturating_add(*amount),
+        EffectKind::GrantChips { amount } => {
+            state.chips_pool = state.chips_pool.saturating_add(*amount)
+        }
         EffectKind::GrantChipsPercent { percent } => {
             let grant = state.chips_pool * (*percent) / 100;
             state.chips_pool = state.chips_pool.saturating_add(grant);
@@ -263,11 +265,8 @@ fn apply_effect(
         }
         EffectKind::DoubleDown => apply_double_down(state),
         EffectKind::TaxRefund { per_card } => {
-            let chips = state
-                .discard_pile
-                .iter()
-                .filter(|c| c.def_id == ESSENCE_CHIP_ID)
-                .count() as u16;
+            let chips =
+                state.discard_pile.iter().filter(|c| c.def_id == ESSENCE_CHIP_ID).count() as u16;
             state.chips_pool = state.chips_pool.saturating_add(chips * per_card);
         }
         EffectKind::HandOp { kind } => return apply_hand_op(state, *kind, played, ctx),
@@ -508,8 +507,9 @@ fn pick_random_slots(
         .iter()
         .copied()
         .filter(|&n| match from {
-            Some(color) => wheel.effective_color(n, state.player_levels.get(SlotColor::Green), None)
-                == color,
+            Some(color) => {
+                wheel.effective_color(n, state.player_levels.get(SlotColor::Green), None) == color
+            }
             None => true,
         })
         .collect();
@@ -530,7 +530,9 @@ fn resolve_numbers(
 ) -> Vec<u32> {
     let wheel = &state.player_wheel;
     let in_color = |n: u32| match from {
-        Some(color) => wheel.effective_color(n, state.player_levels.get(SlotColor::Green), None) == color,
+        Some(color) => {
+            wheel.effective_color(n, state.player_levels.get(SlotColor::Green), None) == color
+        }
         None => true,
     };
     let base: Vec<u32> = wheel.numbers.to_vec();

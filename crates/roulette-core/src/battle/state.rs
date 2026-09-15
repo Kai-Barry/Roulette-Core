@@ -322,7 +322,13 @@ impl BattleState {
     pub fn deal_from_defs(&mut self, defs: &[CardDef], rng: &mut crate::rng::Rng) {
         self.draw_pile = defs
             .iter()
-            .map(|d| CardInstance { def_id: d.id.clone(), marked_slots: Vec::new(), temp: false, retained: false, cost_override: None })
+            .map(|d| CardInstance {
+                def_id: d.id.clone(),
+                marked_slots: Vec::new(),
+                temp: false,
+                retained: false,
+                cost_override: None,
+            })
             .collect();
         rng.shuffle(&mut self.draw_pile);
         self.discard_pile.clear();

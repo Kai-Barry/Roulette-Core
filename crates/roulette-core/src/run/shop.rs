@@ -40,10 +40,7 @@ impl ShopOffer {
         let mut items = Vec::new();
         let mut used = std::collections::BTreeSet::new();
         for _ in 0..6 {
-            let pool: Vec<&CardDef> = cards
-                .iter()
-                .filter(|c| !used.contains(&c.id))
-                .collect();
+            let pool: Vec<&CardDef> = cards.iter().filter(|c| !used.contains(&c.id)).collect();
             if let Some(def) = rng.pick(&pool) {
                 let price = card_price(&def.rarity, rng);
                 used.insert(def.id.clone());
@@ -51,17 +48,12 @@ impl ShopOffer {
             }
         }
         // Two distinct wheel drafts of uncommon/rare/legendary rarity.
-        let drafts: Vec<&WheelDef> = wheels
-            .iter()
-            .filter(|w| w.rarity != WheelRarity::Common)
-            .collect();
+        let drafts: Vec<&WheelDef> =
+            wheels.iter().filter(|w| w.rarity != WheelRarity::Common).collect();
         let mut wheel_used = std::collections::BTreeSet::new();
         for _ in 0..2 {
-            let pool: Vec<&WheelDef> = drafts
-                .iter()
-                .copied()
-                .filter(|w| !wheel_used.contains(&w.id))
-                .collect();
+            let pool: Vec<&WheelDef> =
+                drafts.iter().copied().filter(|w| !wheel_used.contains(&w.id)).collect();
             if let Some(def) = rng.pick(&pool) {
                 wheel_used.insert(def.id.clone());
                 let price = wheel_price(&def.rarity, rng);
@@ -74,9 +66,7 @@ impl ShopOffer {
 
     /// Index of the Blood Infusion item, if present.
     pub fn infusion_index(&self) -> Option<usize> {
-        self.items
-            .iter()
-            .position(|i| matches!(i, ShopItem::BloodInfusion { .. }))
+        self.items.iter().position(|i| matches!(i, ShopItem::BloodInfusion { .. }))
     }
 }
 

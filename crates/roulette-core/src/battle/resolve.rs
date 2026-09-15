@@ -255,7 +255,12 @@ impl BattleState {
         // Persist battle-owned board state only. The folded snapshot carries
         // stack-derived values (card arms) that live on in the stack — writing
         // them back would double-apply on the next spin.
-        let streaks = (board.red_streak_active, board.red_streak_count, board.black_streak_active, board.black_streak_count);
+        let streaks = (
+            board.red_streak_active,
+            board.red_streak_count,
+            board.black_streak_active,
+            board.black_streak_count,
+        );
         match side {
             Side::Player => {
                 let pb = &mut self.player_board;
@@ -398,11 +403,8 @@ impl BattleState {
         } else {
             self.board_for(side).clone()
         };
-        let color = self.wheel(side).effective_color(
-            landed,
-            levels.get(SlotColor::Green),
-            Some(&board),
-        );
+        let color =
+            self.wheel(side).effective_color(landed, levels.get(SlotColor::Green), Some(&board));
         let level = |levels: &ColorLevels, c: SlotColor| levels.get(c);
         let mut pts = 0u16;
         let mut stun = 0u16;

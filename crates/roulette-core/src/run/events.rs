@@ -14,9 +14,7 @@ pub struct EventOutcome {
 
 impl EventOutcome {
     pub fn is_noop(&self) -> bool {
-        self.hp_lost == 0
-            && self.chips_gained == 0
-            && self.cards_granted.is_empty()
+        self.hp_lost == 0 && self.chips_gained == 0 && self.cards_granted.is_empty()
     }
 }
 
@@ -56,10 +54,9 @@ pub fn apply_choice_effects(
                     out.notes.push(format!("unknown card {card_id}"));
                 }
             }
-            other => out.notes.push(format!(
-                "event effect {:?} not applicable at run level",
-                other
-            )),
+            other => {
+                out.notes.push(format!("event effect {:?} not applicable at run level", other))
+            }
         }
     }
     let _ = max_hp;

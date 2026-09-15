@@ -9,6 +9,7 @@ pub mod rewards;
 pub mod shop;
 pub mod state;
 
+pub use events::EventOutcome;
 pub use forge::{ForgeError, ForgeOffer};
 pub use map::{Map, MapNode, NodeType};
 pub use shop::{ShopItem, ShopOffer};
@@ -16,4 +17,3 @@ pub use state::{
     level_cost, BattleResult, Difficulty, GameState, LoadoutOffer, RunError, RunState,
     ShopItemBought,
 };
-pub use events::EventOutcome;

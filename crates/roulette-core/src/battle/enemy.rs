@@ -112,7 +112,8 @@ impl BattleState {
         let chosen: Vec<BetType> = if rng.next_f64() < self.enemy_difficulty as f64 {
             scored.iter().take(2).map(|(t, _)| *t).collect()
         } else {
-            let idx = rng.range_usize(0, scored.len());
+            // `range_usize` is inclusive; `scored` is non-empty here.
+            let idx = rng.range_usize(0, scored.len() - 1);
             vec![scored[idx].0]
         };
 

@@ -254,6 +254,7 @@ version = "2.0.0"
 dependencies = [
  "roulette-content",
  "roulette-core",
+ "serde_json",
 ]
 
 [[package]]

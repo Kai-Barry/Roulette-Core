@@ -87,12 +87,7 @@ pub fn generate(floors: usize, rng: &mut Rng) -> Map {
     let last = floors - 1;
     for f in 1..floors {
         if f == last {
-            map.floors.push(vec![MapNode::new(
-                format!("f{f}l1"),
-                NodeType::Boss,
-                f,
-                1,
-            )]);
+            map.floors.push(vec![MapNode::new(format!("f{f}l1"), NodeType::Boss, f, 1)]);
             break;
         }
         // 2–3 nodes; lanes are distinct picks from {0,1,2}.
@@ -148,9 +143,7 @@ fn connect(map: &mut Map, rng: &mut Rng) {
         }
         for node in &mut map.floors[f] {
             let mut ranked = next.clone();
-            ranked.sort_by_key(|&(_, lane)| {
-                (lane.abs_diff(node.lane), lane)
-            });
+            ranked.sort_by_key(|&(_, lane)| (lane.abs_diff(node.lane), lane));
             node.connections.push(ranked[0].0.clone());
             if let Some(&(_, lane)) = ranked.get(1) {
                 if lane.abs_diff(node.lane) <= 1 && rng.next_f64() < 0.4 {
@@ -165,10 +158,8 @@ fn connect(map: &mut Map, rng: &mut Rng) {
 /// closest-lane node of the previous floor (guarantees reachability).
 fn fix_orphans(map: &mut Map) {
     for f in 1..map.floors.len() {
-        let incoming: Vec<String> = map.floors[f - 1]
-            .iter()
-            .flat_map(|n| n.connections.iter().cloned())
-            .collect();
+        let incoming: Vec<String> =
+            map.floors[f - 1].iter().flat_map(|n| n.connections.iter().cloned()).collect();
         let prev: Vec<(String, u8)> =
             map.floors[f - 1].iter().map(|n| (n.id.clone(), n.lane)).collect();
         for node_idx in 0..map.floors[f].len() {

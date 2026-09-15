@@ -62,9 +62,15 @@ impl ForgeOffer {
     /// Price of taking an op now: free while the free budget lasts, otherwise
     /// the def's ⚡ price (8–25, §9.2).
     pub fn op_price(&self, op_index: usize) -> Option<u16> {
-        self.ops.get(op_index).map(|op| {
-            if self.free_ops_remaining > 0 { 0 } else { op.cost as u16 }
-        })
+        self.ops.get(op_index).map(
+            |op| {
+                if self.free_ops_remaining > 0 {
+                    0
+                } else {
+                    op.cost as u16
+                }
+            },
+        )
     }
 }
 
@@ -72,13 +78,9 @@ fn roll_ops(vocabulary: &[ForgeOpDef], rng: &mut Rng) -> Vec<ForgeOpDef> {
     let mut ops: Vec<ForgeOpDef> = Vec::new();
     for _ in 0..FREE_OPS {
         let rarity = roll_op_rarity(rng);
-        let pool: Vec<&ForgeOpDef> =
-            vocabulary.iter().filter(|op| op.rarity == rarity).collect();
-        let fallback: Vec<&ForgeOpDef> = if pool.is_empty() {
-            vocabulary.iter().collect()
-        } else {
-            pool
-        };
+        let pool: Vec<&ForgeOpDef> = vocabulary.iter().filter(|op| op.rarity == rarity).collect();
+        let fallback: Vec<&ForgeOpDef> =
+            if pool.is_empty() { vocabulary.iter().collect() } else { pool };
         if let Some(op) = rng.pick(&fallback) {
             ops.push((*op).clone());
         }

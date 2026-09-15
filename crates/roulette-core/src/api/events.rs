@@ -10,43 +10,113 @@ use roulette_content::schema::{EnemyTier, SlotColor};
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum EngineEvent {
-    RunStarted { seed: String, difficulty: Difficulty },
-    NodePicked { id: String, node_type: NodeType },
-    BattleStarted { tier: EnemyTier, round_limit: u32, enemy_hp: u16 },
-    CardPlayed { card_id: String, cost: u16 },
-    DrawBought { cost: u16, card_id: String },
-    BetPlaced { bet: BetType, amount: u16 },
-    BetRemoved { bet: BetType, amount: u16 },
+    RunStarted {
+        seed: String,
+        difficulty: Difficulty,
+    },
+    NodePicked {
+        id: String,
+        node_type: NodeType,
+    },
+    BattleStarted {
+        tier: EnemyTier,
+        round_limit: u32,
+        enemy_hp: u16,
+    },
+    CardPlayed {
+        card_id: String,
+        cost: u16,
+    },
+    DrawBought {
+        cost: u16,
+        card_id: String,
+    },
+    BetPlaced {
+        bet: BetType,
+        amount: u16,
+    },
+    BetRemoved {
+        bet: BetType,
+        amount: u16,
+    },
     BetsCleared,
     Rebet,
     Sacrificed,
-    PredictionShown { start_slot: usize, size: u8 },
-    SpinStarted { side: Side },
-    BallLanded { side: Side, number: u32 },
-    SpinResolved { side: Side, pts: u16, insurance_refund: u16, all_lost: bool },
+    PredictionShown {
+        start_slot: usize,
+        size: u8,
+    },
+    SpinStarted {
+        side: Side,
+    },
+    BallLanded {
+        side: Side,
+        number: u32,
+    },
+    SpinResolved {
+        side: Side,
+        pts: u16,
+        insurance_refund: u16,
+        all_lost: bool,
+    },
     IntentExecuted,
-    RoundEnded { round: u32, player_pts: u16, enemy_pts: u16, outcome: RoundOutcome },
-    BattleEnded { result: BattleResultEvent },
+    RoundEnded {
+        round: u32,
+        player_pts: u16,
+        enemy_pts: u16,
+        outcome: RoundOutcome,
+    },
+    BattleEnded {
+        result: BattleResultEvent,
+    },
     NodeCompleted,
     NodeFailed,
-    RewardCards { ids: Vec<String> },
-    ChipsChanged { side: Side, delta: i32 },
-    Purchased { item: usize, price: u16 },
+    RewardCards {
+        ids: Vec<String>,
+    },
+    ChipsChanged {
+        side: Side,
+        delta: i32,
+    },
+    Purchased {
+        item: usize,
+        price: u16,
+    },
     CardGained(String),
     WheelGained(String),
     Healed(u16),
-    ForgeApplied { op: usize },
+    ForgeApplied {
+        op: usize,
+    },
     ForgeRerolled,
-    EventChosen { choice: String, hp_lost: u16, chips_gained: u16, cards: Vec<String> },
-    ColorLevelBought { color: SlotColor, level: u8 },
+    EventChosen {
+        choice: String,
+        hp_lost: u16,
+        chips_gained: u16,
+        cards: Vec<String>,
+    },
+    ColorLevelBought {
+        color: SlotColor,
+        level: u8,
+    },
     /// §4.8 customizer: a slot's color cycled to `color`.
-    SlotColorCycled { slot: usize, color: SlotColor },
+    SlotColorCycled {
+        slot: usize,
+        color: SlotColor,
+    },
     /// §4.8 customizer: a slot carrying `number` was added.
-    SlotAdded { number: u32 },
+    SlotAdded {
+        number: u32,
+    },
     /// §4.8 customizer: the slot at `slot` was removed.
-    SlotRemoved { slot: usize },
+    SlotRemoved {
+        slot: usize,
+    },
     /// §4.8 customizer: the slot's number was set.
-    SlotNumberSet { slot: usize, number: u32 },
+    SlotNumberSet {
+        slot: usize,
+        number: u32,
+    },
     /// §4.8 customizer: the draft wheel was committed to the run.
     WheelSaved,
     /// §4.8 customizer: the draft wheel was discarded.

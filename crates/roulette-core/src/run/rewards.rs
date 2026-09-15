@@ -36,19 +36,15 @@ pub fn reward_cards<'a>(cards: &'a [CardDef], tier: EnemyTier, rng: &mut Rng) ->
     for _ in 0..picks {
         let rarity = roll_rarity(rng);
         let mut rarity_now = rarity;
-        let mut pool: Vec<&CardDef> =
-            cards.iter().filter(|c| c.rarity == rarity_now).collect();
+        let mut pool: Vec<&CardDef> = cards.iter().filter(|c| c.rarity == rarity_now).collect();
         // Fall down the table when a band runs dry (common always ships).
         while pool.is_empty() && rarity_now != CardRarity::Common {
             rarity_now = lower_rarity(&rarity_now);
             pool = cards.iter().filter(|c| c.rarity == rarity_now).collect();
         }
         // Pick avoiding duplicates already chosen.
-        let mut available: Vec<&CardDef> = pool
-            .iter()
-            .copied()
-            .filter(|c| !chosen.iter().any(|c2| c2.id == c.id))
-            .collect();
+        let mut available: Vec<&CardDef> =
+            pool.iter().copied().filter(|c| !chosen.iter().any(|c2| c2.id == c.id)).collect();
         if available.is_empty() {
             available = pool;
         }

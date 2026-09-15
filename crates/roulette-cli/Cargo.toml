@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 roulette-core = { path = "../roulette-core" }
 roulette-content = { path = "../roulette-content" }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

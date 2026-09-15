@@ -2,6 +2,7 @@
 //! (§2.5), shop (§9.1), forge (§9.2), events (§9.4), color levels (§4.5),
 //! run flow with a seeded full-run playthrough.
 
+use roulette_content::schema::SlotColor;
 use roulette_content::Content;
 use roulette_core::battle::state::{BattleOutcome, CombatMode, Side};
 use roulette_core::bets::BetType;
@@ -9,7 +10,6 @@ use roulette_core::rng::Rng;
 use roulette_core::run::map::NodeType;
 use roulette_core::run::state::{BattleResult, Difficulty, GameState, RunError, RunState};
 use roulette_core::run::{forge, level_cost};
-use roulette_content::schema::SlotColor;
 
 fn content() -> Content {
     roulette_content::schema::Content::embedded().expect("embedded content loads")
@@ -85,10 +85,8 @@ fn map_connections_follow_closest_lane_with_optional_second() {
             }
             // The primary connection is the closest-lane node.
             let primary = map.node(&node.connections[0]).unwrap();
-            let best = next
-                .iter()
-                .min_by_key(|&(_, lane)| (lane.abs_diff(node.lane), lane))
-                .unwrap();
+            let best =
+                next.iter().min_by_key(|&(_, lane)| (lane.abs_diff(node.lane), lane)).unwrap();
             assert_eq!(primary.lane, best.1, "primary connection must be closest lane");
             // Second connection (if any) is ≤ 1 lane away and distinct.
             if let Some(second) = node.connections.get(1) {
@@ -120,16 +118,10 @@ fn map_is_fully_reachable_from_every_floor0_node() {
         assert!(seen.contains(&boss), "seed {seed}: boss unreachable");
         // Orphan fix: every non-first-floor node has ≥1 incoming edge.
         for f in 1..map.floors.len() {
-            let incoming: Vec<String> = map.floors[f - 1]
-                .iter()
-                .flat_map(|n| n.connections.clone())
-                .collect();
+            let incoming: Vec<String> =
+                map.floors[f - 1].iter().flat_map(|n| n.connections.clone()).collect();
             for node in &map.floors[f] {
-                assert!(
-                    incoming.contains(&node.id),
-                    "seed {seed}: node {} orphaned",
-                    node.id
-                );
+                assert!(incoming.contains(&node.id), "seed {seed}: node {} orphaned", node.id);
             }
         }
     }
@@ -168,16 +160,8 @@ fn reward_rarity_distribution_matches_table() {
         }] += 1;
     }
     // Cumulative bands: legendary 3%, rare 9%, uncommon 28%, common 60%.
-    assert!(
-        (counts[3] as f64 / trials as f64) < 0.05,
-        "legendary ~3%, got {}",
-        counts[3]
-    );
-    assert!(
-        (counts[2] as f64 / trials as f64).between(0.07, 0.11),
-        "rare ~9%, got {}",
-        counts[2]
-    );
+    assert!((counts[3] as f64 / trials as f64) < 0.05, "legendary ~3%, got {}", counts[3]);
+    assert!((counts[2] as f64 / trials as f64).between(0.07, 0.11), "rare ~9%, got {}", counts[2]);
     assert!(
         (counts[1] as f64 / trials as f64).between(0.26, 0.30),
         "uncommon ~28%, got {}",
@@ -319,12 +303,7 @@ fn forge_ops_mutate_wheel_with_two_slot_rule() {
         let pickable = run.pickable_nodes();
         let target = pickable
             .iter()
-            .find(|id| {
-                run.map
-                    .node(id)
-                    .map(|n| n.node_type == NodeType::Forge)
-                    .unwrap_or(false)
-            })
+            .find(|id| run.map.node(id).map(|n| n.node_type == NodeType::Forge).unwrap_or(false))
             .cloned();
         match target {
             Some(id) => {
@@ -464,10 +443,8 @@ fn path_rule_blocks_unconnected_nodes() {
     for seed in 0..50u32 {
         let candidate = RunState::start_new_run(&c, &format!("path{seed}"), Difficulty::Short);
         let conn = candidate.map.node("f0l0").unwrap().connections.clone();
-        let offpath = candidate.map.floors[1]
-            .iter()
-            .map(|n| n.id.clone())
-            .find(|id| !conn.contains(id));
+        let offpath =
+            candidate.map.floors[1].iter().map(|n| n.id.clone()).find(|id| !conn.contains(id));
         if let Some(off) = offpath {
             run = Some((candidate, off));
             break;
@@ -491,7 +468,10 @@ fn path_rule_blocks_unconnected_nodes() {
 
 /// Plays a full battle with a simple policy: stake everything viable on a
 /// number that will land. Returns the run outcome of the node fight.
-fn win_battle(battle: &mut roulette_core::battle::state::BattleState, rng: &mut Rng) -> BattleOutcome {
+fn win_battle(
+    battle: &mut roulette_core::battle::state::BattleState,
+    rng: &mut Rng,
+) -> BattleOutcome {
     let mut outcome = BattleOutcome::InProgress;
     while outcome == BattleOutcome::InProgress {
         battle.begin_betting(Side::Player);
@@ -532,20 +512,11 @@ fn full_run_short_playthrough_victory() {
         // Prefer the boss; else any pickable.
         let target = pickable
             .iter()
-            .find(|id| {
-                run.map
-                    .node(id)
-                    .map(|n| n.node_type == NodeType::Boss)
-                    .unwrap_or(false)
-            })
+            .find(|id| run.map.node(id).map(|n| n.node_type == NodeType::Boss).unwrap_or(false))
             .cloned()
             .unwrap_or_else(|| pickable[0].clone());
         run.pick_node(&target, &c, &mut rng).unwrap();
-        let node_type = run
-            .map
-            .node(&target)
-            .unwrap()
-            .node_type;
+        let node_type = run.map.node(&target).unwrap().node_type;
         match node_type {
             NodeType::Combat | NodeType::Elite | NodeType::Boss => {
                 let mut battle = run.enter_battle(&c, &mut rng).unwrap();
@@ -645,16 +616,19 @@ fn elite_and_boss_attach_curses() {
     let seed = "curses";
     // Elite: exactly 2 curses.
     let mut rng = Rng::from_string_seed(seed).derive("curses");
-    let elite_curses = RunState::roll_curses(roulette_content::schema::EnemyTier::Elite, &c, &mut rng);
+    let elite_curses =
+        RunState::roll_curses(roulette_content::schema::EnemyTier::Elite, &c, &mut rng);
     assert_eq!(elite_curses.len(), 2);
     // Boss: 2–3 curses.
     for i in 0..10 {
         let mut rng = Rng::new(i).derive("curses");
-        let boss_curses = RunState::roll_curses(roulette_content::schema::EnemyTier::Boss, &c, &mut rng);
+        let boss_curses =
+            RunState::roll_curses(roulette_content::schema::EnemyTier::Boss, &c, &mut rng);
         assert!((2..=3).contains(&boss_curses.len()), "boss got {}", boss_curses.len());
     }
     // Curses are distinct.
-    let ids: std::collections::BTreeSet<&str> = elite_curses.iter().map(|c| c.id.as_str()).collect();
+    let ids: std::collections::BTreeSet<&str> =
+        elite_curses.iter().map(|c| c.id.as_str()).collect();
     assert_eq!(ids.len(), 2);
 }
 
@@ -691,18 +665,11 @@ fn shop_purchase_flows() {
         .find(|n| n.node_type == NodeType::Shop)
         .map(|n| n.id.clone())
         .expect("short map has shop floors");
-    let path_ok = run
-        .pickable_nodes()
-        .contains(&shop_node)
-        || {
-            // Walk to its floor parent chain: pick any node whose connections
-            // reach it.
-            run.map
-                .floors
-                .iter()
-                .flatten()
-                .any(|n| n.connections.contains(&shop_node))
-        };
+    let path_ok = run.pickable_nodes().contains(&shop_node) || {
+        // Walk to its floor parent chain: pick any node whose connections
+        // reach it.
+        run.map.floors.iter().flatten().any(|n| n.connections.contains(&shop_node))
+    };
     if path_ok {
         run.shop_offer = Some(roulette_core::run::ShopOffer::generate(
             &c.cards,
@@ -725,10 +692,7 @@ fn shop_purchase_flows() {
 fn map_node_type_helper() {
     let c = content();
     let run = RunState::start_new_run(&c, "helper", Difficulty::Short);
-    assert_eq!(
-        roulette_core::run::state::node_type_at(&run, "f0l1"),
-        Some(NodeType::Combat)
-    );
+    assert_eq!(roulette_core::run::state::node_type_at(&run, "f0l1"), Some(NodeType::Combat));
     assert_eq!(roulette_core::run::state::node_type_at(&run, "nope"), None);
 }
 

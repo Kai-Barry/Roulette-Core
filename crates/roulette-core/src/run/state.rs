@@ -152,14 +152,10 @@ impl RunState {
         let common_wheels: Vec<&roulette_content::schema::WheelDef> = content
             .wheels
             .iter()
-            .filter(|w| {
-                w.rarity == roulette_content::schema::WheelRarity::Common
-            })
+            .filter(|w| w.rarity == roulette_content::schema::WheelRarity::Common)
             .collect();
-        let wheel_def = rng
-            .pick(&common_wheels)
-            .copied()
-            .expect("content must ship a common wheel");
+        let wheel_def =
+            rng.pick(&common_wheels).copied().expect("content must ship a common wheel");
         let wheel = WheelConfig::from_def(wheel_def);
         let selected = wheel.id.clone();
         let mut rng = rng.derive("map");
@@ -220,16 +216,12 @@ impl RunState {
             }
         }
         let wheel_id = self.player_wheel.id.clone();
-        self.loadout_offer =
-            Some(LoadoutOffer { card_ids: picked, wheel_id, card_price: 2 });
+        self.loadout_offer = Some(LoadoutOffer { card_ids: picked, wheel_id, card_price: 2 });
     }
 
     /// Drafts one offered card into the deck (2 PTS each).
     pub fn draft_card(&mut self, card_id: &str) -> Result<(), RunError> {
-        let offer = self
-            .loadout_offer
-            .as_ref()
-            .ok_or(RunError::NotInState(self.state))?;
+        let offer = self.loadout_offer.as_ref().ok_or(RunError::NotInState(self.state))?;
         if !offer.card_ids.contains(&card_id.to_string()) {
             return Err(RunError::ContentMissing(card_id.to_string()));
         }
@@ -249,15 +241,8 @@ impl RunState {
 
     /// Takes the offered common wheel into the owned wheels (free).
     pub fn draft_wheel(&mut self) -> Result<(), RunError> {
-        let offer = self
-            .loadout_offer
-            .as_ref()
-            .ok_or(RunError::NotInState(self.state))?;
-        if !self
-            .owned_wheels
-            .iter()
-            .any(|w| w.id == offer.wheel_id)
-        {
+        let offer = self.loadout_offer.as_ref().ok_or(RunError::NotInState(self.state))?;
+        if !self.owned_wheels.iter().any(|w| w.id == offer.wheel_id) {
             self.owned_wheels.push(self.player_wheel.clone());
         }
         Ok(())
@@ -287,16 +272,19 @@ impl RunState {
                 .first()
                 .map(|row| row.iter().map(|n| n.id.clone()).collect())
                 .unwrap_or_default(),
-            Some(current) => self
-                .map
-                .node(current)
-                .map(|n| n.connections.clone())
-                .unwrap_or_default(),
+            Some(current) => {
+                self.map.node(current).map(|n| n.connections.clone()).unwrap_or_default()
+            }
         }
     }
 
     /// Picks the next node and opens its encounter.
-    pub fn pick_node(&mut self, node_id: &str, content: &Content, rng: &mut Rng) -> Result<(), RunError> {
+    pub fn pick_node(
+        &mut self,
+        node_id: &str,
+        content: &Content,
+        rng: &mut Rng,
+    ) -> Result<(), RunError> {
         let node = self
             .map
             .node(node_id)
@@ -360,10 +348,8 @@ impl RunState {
         let pool: Vec<&CurseDef> = content.curses.iter().collect();
         let mut picked = Vec::new();
         for _ in 0..count {
-            let available: Vec<&&CurseDef> = pool
-                .iter()
-                .filter(|c| !picked.iter().any(|p: &CurseDef| p.id == c.id))
-                .collect();
+            let available: Vec<&&CurseDef> =
+                pool.iter().filter(|c| !picked.iter().any(|p: &CurseDef| p.id == c.id)).collect();
             if available.is_empty() {
                 break;
             }
@@ -378,16 +364,17 @@ impl RunState {
     ///
     /// Pool rule: the house stakes the table at 30 ⚡ (§3.1); a bankroll above
     /// 30 carries in untouched. Curses attach per tier (elite 2, boss 2–3).
-    pub fn enter_battle(&mut self, content: &Content, rng: &mut Rng) -> Result<BattleState, RunError> {
+    pub fn enter_battle(
+        &mut self,
+        content: &Content,
+        rng: &mut Rng,
+    ) -> Result<BattleState, RunError> {
         if self.state != GameState::Combat {
             return Err(RunError::NotInState(self.state));
         }
         let tier = self.current_node_tier()?;
-        let pool: Vec<&roulette_content::schema::EnemyDef> = content
-            .enemies
-            .iter()
-            .filter(|e| e.tier == tier)
-            .collect();
+        let pool: Vec<&roulette_content::schema::EnemyDef> =
+            content.enemies.iter().filter(|e| e.tier == tier).collect();
         let enemy_def = rng
             .pick(&pool)
             .copied()
@@ -434,18 +421,10 @@ impl RunState {
             .collect();
         battle.deal_from_defs(&defs, rng);
         // §4.5 unlocks arm the streak trackers.
-        if self
-            .player_wheel
-            .unlocked_abilities
-            .contains(&SlotColor::Red)
-        {
+        if self.player_wheel.unlocked_abilities.contains(&SlotColor::Red) {
             battle.player_board.red_streak_active = true;
         }
-        if self
-            .player_wheel
-            .unlocked_abilities
-            .contains(&SlotColor::Black)
-        {
+        if self.player_wheel.unlocked_abilities.contains(&SlotColor::Black) {
             battle.player_board.black_streak_active = true;
         }
         Ok(battle)
@@ -504,10 +483,7 @@ impl RunState {
     /// leaving shop/forge/event screens).
     pub fn complete_node(&mut self) -> Result<(), RunError> {
         let id = self.current_node.clone().ok_or(RunError::NoCurrentNode)?;
-        let node = self
-            .map
-            .node_mut(&id)
-            .ok_or(RunError::InvalidNode(id))?;
+        let node = self.map.node_mut(&id).ok_or(RunError::InvalidNode(id))?;
         node.completed = true;
         self.state = GameState::Map;
         // Clear per-node caches (§9.1: RETURN TO PATHS clears the cache).
@@ -527,10 +503,7 @@ impl RunState {
         if self.state != GameState::Shop {
             return Err(RunError::NotInState(self.state));
         }
-        let offer = self
-            .shop_offer
-            .as_ref()
-            .ok_or(RunError::NotInState(self.state))?;
+        let offer = self.shop_offer.as_ref().ok_or(RunError::NotInState(self.state))?;
         let item = offer
             .items
             .get(item_index)
@@ -591,18 +564,11 @@ impl RunState {
     // ------------------------------------------------------------------
 
     /// Takes a forge offer: free while budget lasts, else priced in ⚡.
-    pub fn forge_take(
-        &mut self,
-        op_index: usize,
-        rng: &mut Rng,
-    ) -> Result<(), RunError> {
+    pub fn forge_take(&mut self, op_index: usize, rng: &mut Rng) -> Result<(), RunError> {
         if self.state != GameState::Forge {
             return Err(RunError::NotInState(self.state));
         }
-        let offer = self
-            .forge_offer
-            .as_ref()
-            .ok_or(RunError::NotInState(self.state))?;
+        let offer = self.forge_offer.as_ref().ok_or(RunError::NotInState(self.state))?;
         let price = offer
             .op_price(op_index)
             .ok_or_else(|| RunError::ContentMissing(format!("forge op {op_index}")))?;
@@ -619,17 +585,17 @@ impl RunState {
             o.ops.remove(op_index);
         }
         // Keep the active wheel in sync with the customized copy.
-        self.owned_wheels = self
-            .owned_wheels
-            .iter()
-            .map(|w| {
-                if w.id == self.player_wheel.id {
-                    self.player_wheel.clone()
-                } else {
-                    w.clone()
-                }
-            })
-            .collect();
+        self.owned_wheels =
+            self.owned_wheels
+                .iter()
+                .map(|w| {
+                    if w.id == self.player_wheel.id {
+                        self.player_wheel.clone()
+                    } else {
+                        w.clone()
+                    }
+                })
+                .collect();
         Ok(())
     }
 

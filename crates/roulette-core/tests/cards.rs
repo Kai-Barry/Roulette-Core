@@ -5,17 +5,15 @@
 use std::collections::BTreeMap;
 
 use roulette_content::schema::{
-    CardDef, CardRarity, CardType, ChipDestination, ConvertScope, DurationKind, EffectKind,
-    HandOp, NumberSet, PayoutTarget, SlotColor, StunCondition, ZoneKind,
+    CardDef, CardRarity, CardType, ChipDestination, ConvertScope, DurationKind, EffectKind, HandOp,
+    NumberSet, PayoutTarget, SlotColor, StunCondition, ZoneKind,
 };
 use roulette_core::battle::state::{BattlePhase, Side};
 use roulette_core::battle::{BattleState, CombatMode, SpinInput};
 use roulette_core::bets::BetType;
-use roulette_core::cards::effects::{
-    play_card_with_effects, EffectCtx, ESSENCE_CHIP_ID,
-};
-use roulette_core::cards::format::format_description;
 use roulette_core::board::ModifierKind;
+use roulette_core::cards::effects::{play_card_with_effects, EffectCtx, ESSENCE_CHIP_ID};
+use roulette_core::cards::format::format_description;
 use roulette_core::rng::Rng;
 use roulette_core::wheel::WheelConfig;
 
@@ -23,7 +21,12 @@ use roulette_core::wheel::WheelConfig;
 // Fixtures
 // ---------------------------------------------------------------------------
 
-fn payout_table(red: f32, black: f32, green: f32, number: f32) -> roulette_content::schema::PayoutTable {
+fn payout_table(
+    red: f32,
+    black: f32,
+    green: f32,
+    number: f32,
+) -> roulette_content::schema::PayoutTable {
     roulette_content::schema::PayoutTable {
         red,
         black,
@@ -61,16 +64,8 @@ fn test_wheel() -> WheelConfig {
 }
 
 fn fresh_battle() -> BattleState {
-    let mut state = BattleState::new(
-        test_wheel(),
-        test_wheel(),
-        50,
-        50,
-        50,
-        3,
-        Vec::new(),
-        CombatMode::Points,
-    );
+    let mut state =
+        BattleState::new(test_wheel(), test_wheel(), 50, 50, 50, 3, Vec::new(), CombatMode::Points);
     state.enemy_difficulty = 1.0;
     state.begin_betting(Side::Player);
     state
@@ -88,10 +83,15 @@ fn card(id: &str, cost: u8, card_type: CardType, effects: Vec<EffectKind>) -> Ca
     }
 }
 
-
 /// Physics effect with explicit fields (no struct-update syntax needed).
 #[allow(clippy::too_many_arguments)]
-fn physics(friction: f32, prediction: Option<u8>, spin: Option<f32>, nudge: Option<u8>, multiball: u8) -> EffectKind {
+fn physics(
+    friction: f32,
+    prediction: Option<u8>,
+    spin: Option<f32>,
+    nudge: Option<u8>,
+    multiball: u8,
+) -> EffectKind {
     EffectKind::Physics {
         friction: Some(friction),
         ball_mass: None,
@@ -130,7 +130,11 @@ fn with_hand(state: &mut BattleState, ids: &[&str]) {
 }
 
 /// Plays hand card `idx` against the defs.
-fn play(state: &mut BattleState, idx: usize, defs: &std::collections::BTreeMap<String, CardDef>) -> bool {
+fn play(
+    state: &mut BattleState,
+    idx: usize,
+    defs: &std::collections::BTreeMap<String, CardDef>,
+) -> bool {
     let mut rng = Rng::from_string_seed("phase5");
     let mut ctx = EffectCtx { defs, rng: &mut rng };
     play_card_with_effects(state, idx, &mut ctx).expect("play should not error")
@@ -263,12 +267,8 @@ fn prime_arm_folds_on_prime_number_bets() {
 
 #[test]
 fn double_payout_is_one_shot_next_win() {
-    let defs = defs(vec![card(
-        "double_payout",
-        1,
-        CardType::Payout,
-        vec![EffectKind::DoubleNextPayout],
-    )]);
+    let defs =
+        defs(vec![card("double_payout", 1, CardType::Payout, vec![EffectKind::DoubleNextPayout])]);
     let mut state = fresh_battle();
     with_hand(&mut state, &["double_payout"]);
     assert!(play(&mut state, 0, &defs));
@@ -344,12 +344,7 @@ fn quick_draw_heavy_draw_and_calculated_risk() {
             CardType::Utility,
             vec![EffectKind::Draw { count: 3 }, EffectKind::DiscardRandom { count: 1 }],
         ),
-        card(
-            "calculated_risk",
-            1,
-            CardType::Utility,
-            vec![EffectKind::DiscardHandThenDrawEqual],
-        ),
+        card("calculated_risk", 1, CardType::Utility, vec![EffectKind::DiscardHandThenDrawEqual]),
     ]);
     let mut state = fresh_battle();
     state.draw_pile = (0..10)
@@ -380,7 +375,12 @@ fn quick_draw_heavy_draw_and_calculated_risk() {
 #[test]
 fn golden_mirror_clones_two_zero_cost_temps() {
     let defs = defs(vec![
-        card("golden_mirror", 1, CardType::Utility, vec![EffectKind::HandOp { kind: HandOp::CopyRandomHandCard }]),
+        card(
+            "golden_mirror",
+            1,
+            CardType::Utility,
+            vec![EffectKind::HandOp { kind: HandOp::CopyRandomHandCard }],
+        ),
         card("red_blast", 3, CardType::Payout, vec![EffectKind::GrantChips { amount: 1 }]),
     ]);
     let mut state = fresh_battle();
@@ -391,11 +391,7 @@ fn golden_mirror_clones_two_zero_cost_temps() {
     // red_blast is available, so 2 × 0-cost red_blast copies land in hand.
     assert!(play_card_with_effects(&mut state, 0, &mut ctx).unwrap());
     assert_eq!(state.hand.len(), 3);
-    let clones: Vec<_> = state
-        .hand
-        .iter()
-        .filter(|c| c.def_id == "red_blast" && c.temp)
-        .collect();
+    let clones: Vec<_> = state.hand.iter().filter(|c| c.def_id == "red_blast" && c.temp).collect();
     assert_eq!(clones.len(), 2, "original stays non-temp; 2 temp copies added");
 }
 
@@ -403,7 +399,12 @@ fn golden_mirror_clones_two_zero_cost_temps() {
 fn copy_paste_clones_last_played_non_utility() {
     let defs = defs(vec![
         card("red_blast", 2, CardType::Payout, vec![EffectKind::GrantChips { amount: 1 }]),
-        card("copy_paste", 1, CardType::Utility, vec![EffectKind::HandOp { kind: HandOp::CopyLastPlayed }]),
+        card(
+            "copy_paste",
+            1,
+            CardType::Utility,
+            vec![EffectKind::HandOp { kind: HandOp::CopyLastPlayed }],
+        ),
         card("skipped", 1, CardType::Utility, vec![EffectKind::GrantChips { amount: 1 }]),
     ]);
     let mut state = fresh_battle();
@@ -432,8 +433,18 @@ fn copy_paste_clones_last_played_non_utility() {
 #[test]
 fn retain_vision_and_recycle_bin_and_identity_shift() {
     let defs = defs(vec![
-        card("retain_vision", 1, CardType::Utility, vec![EffectKind::HandOp { kind: HandOp::Retain }]),
-        card("recycle_bin", 1, CardType::Utility, vec![EffectKind::HandOp { kind: HandOp::RecycleFromDiscard }]),
+        card(
+            "retain_vision",
+            1,
+            CardType::Utility,
+            vec![EffectKind::HandOp { kind: HandOp::Retain }],
+        ),
+        card(
+            "recycle_bin",
+            1,
+            CardType::Utility,
+            vec![EffectKind::HandOp { kind: HandOp::RecycleFromDiscard }],
+        ),
         card(
             "essence_recycle",
             1,
@@ -517,10 +528,7 @@ fn essence_chip_exiles_and_grants() {
         ESSENCE_CHIP_ID,
         0,
         CardType::Money,
-        vec![
-            EffectKind::ActionSurge { chips: 4 },
-            EffectKind::HandOp { kind: HandOp::ExileSelf },
-        ],
+        vec![EffectKind::ActionSurge { chips: 4 }, EffectKind::HandOp { kind: HandOp::ExileSelf }],
     )]);
     let mut state = fresh_battle();
     with_hand(&mut state, &[ESSENCE_CHIP_ID]);
@@ -561,12 +569,7 @@ fn chip_maker_makes_three_temp_draw_pile_chips() {
 #[test]
 fn tax_refund_counts_essence_chips_in_discard() {
     let defs = defs(vec![
-        card(
-            "money_tax_refund",
-            1,
-            CardType::Money,
-            vec![EffectKind::TaxRefund { per_card: 2 }],
-        ),
+        card("money_tax_refund", 1, CardType::Money, vec![EffectKind::TaxRefund { per_card: 2 }]),
         card("chip", 0, CardType::Money, vec![EffectKind::ActionSurge { chips: 1 }]),
     ]);
     let mut state = fresh_battle();
@@ -668,26 +671,21 @@ fn double_down_doubles_bets_and_intent() {
 
 #[test]
 fn insurance_refunds_and_consumes_stack_entry() {
-    let defs = defs(vec![card("insurance_policy", 1, CardType::Utility, vec![EffectKind::Insurance])]);
+    let defs =
+        defs(vec![card("insurance_policy", 1, CardType::Utility, vec![EffectKind::Insurance])]);
     let mut state = fresh_battle();
     with_hand(&mut state, &["insurance_policy"]);
     assert!(play(&mut state, 0, &defs));
-    assert!(state
-        .player_stack
-        .entries()
-        .iter()
-        .any(|e| matches!(e.kind, ModifierKind::Insurance)));
+    assert!(state.player_stack.entries().iter().any(|e| matches!(e.kind, ModifierKind::Insurance)));
     state.chips_pool = 60;
     state.place_bet(BetType::Red, 10).unwrap();
     let out = state.resolve_spin(&spin_input(2)); // black → lost
     assert_eq!(out.insurance_refund, 10);
     assert_eq!(state.chips_pool, 60, "stake refunded");
-    assert!(!state
-        .player_stack
-        .entries()
-        .iter()
-        .any(|e| matches!(e.kind, ModifierKind::Insurance)),
-        "insurance consumed");
+    assert!(
+        !state.player_stack.entries().iter().any(|e| matches!(e.kind, ModifierKind::Insurance)),
+        "insurance consumed"
+    );
     // Second spin: no refund.
     state.begin_betting(Side::Player);
     state.place_bet(BetType::Red, 10).unwrap();
@@ -789,12 +787,7 @@ fn compound_interest_grants_half_pool() {
 #[test]
 fn physics_cards_arm_and_reset_per_spin() {
     let defs = defs(vec![
-        card(
-            "friction_oil",
-            2,
-            CardType::Physics,
-            vec![physics(0.65, None, None, None, 0)],
-        ),
+        card("friction_oil", 2, CardType::Physics, vec![physics(0.65, None, None, None, 0)]),
         card("eagle_eye", 4, CardType::Physics, vec![physics(1.0, Some(1), None, None, 0)]),
     ]);
     let mut state = fresh_battle();
@@ -909,17 +902,18 @@ fn red_sea_spin_scope_clears_after_one_spin() {
     assert!(play(&mut state, 0, &defs));
     // Spin-scope converts land in the paint layer (converts are fight-scope).
     let board = state.merged_board(Side::Player);
-    assert!(board
-        .paints
-        .get(&SlotColor::Red)
-        .is_some_and(|s| s.contains(&2)), "black 2 → red");
+    assert!(board.paints.get(&SlotColor::Red).is_some_and(|s| s.contains(&2)), "black 2 → red");
     state.chips_pool = 60;
     state.place_bet(BetType::Number(2), 1).unwrap();
     state.resolve_spin(&spin_input(2)); // now red → wins at 2.0
     assert_eq!(state.bets.len(), 0);
     state.begin_betting(Side::Player);
     assert!(
-        !state.merged_board(Side::Player).converts.get(&SlotColor::Red).is_some_and(|s| s.contains(&2)),
+        !state
+            .merged_board(Side::Player)
+            .converts
+            .get(&SlotColor::Red)
+            .is_some_and(|s| s.contains(&2)),
         "spin-scoped convert cleared"
     );
 }
@@ -953,7 +947,11 @@ fn paint_green_marks_three_slots_for_the_round() {
     }
     // Round scope: cleared at end_round.
     state.end_round();
-    assert!(state.merged_board(Side::Player).paints.get(&SlotColor::Green).is_none_or(|s| s.is_empty()));
+    assert!(state
+        .merged_board(Side::Player)
+        .paints
+        .get(&SlotColor::Green)
+        .is_none_or(|s| s.is_empty()));
 }
 
 #[test]
@@ -1000,7 +998,12 @@ fn chip_mine_and_lucky_zone_and_cursed_zone_marks() {
             "chip_mine",
             1,
             CardType::Board,
-            vec![EffectKind::ZoneMark { kind: ZoneKind::ChipMine, slots: vec![12], count: None, value: Some(15) }],
+            vec![EffectKind::ZoneMark {
+                kind: ZoneKind::ChipMine,
+                slots: vec![12],
+                count: None,
+                value: Some(15),
+            }],
         ),
         card(
             "lucky_zone",
@@ -1062,7 +1065,12 @@ fn unknown_def_id_errors() {
 
 #[test]
 fn card_cost_charges_pool() {
-    let defs = defs(vec![card("expensive", 3, CardType::Payout, vec![EffectKind::GrantChips { amount: 1 }])]);
+    let defs = defs(vec![card(
+        "expensive",
+        3,
+        CardType::Payout,
+        vec![EffectKind::GrantChips { amount: 1 }],
+    )]);
     let mut state = fresh_battle();
     with_hand(&mut state, &["expensive"]);
     let pool = state.chips_pool;
@@ -1072,7 +1080,8 @@ fn card_cost_charges_pool() {
 
 #[test]
 fn free_card_credit_makes_play_free() {
-    let defs = defs(vec![card("cheap", 2, CardType::Payout, vec![EffectKind::GrantChips { amount: 0 }])]);
+    let defs =
+        defs(vec![card("cheap", 2, CardType::Payout, vec![EffectKind::GrantChips { amount: 0 }])]);
     let mut state = fresh_battle();
     with_hand(&mut state, &["cheap"]);
     state.free_cards_active = 1;
@@ -1084,7 +1093,8 @@ fn free_card_credit_makes_play_free() {
 
 #[test]
 fn cannot_play_during_spin_phase() {
-    let _defs = defs(vec![card("cheap", 0, CardType::Utility, vec![EffectKind::GrantChips { amount: 0 }])]);
+    let _defs =
+        defs(vec![card("cheap", 0, CardType::Utility, vec![EffectKind::GrantChips { amount: 0 }])]);
     let mut state = fresh_battle();
     with_hand(&mut state, &["cheap"]);
     state.place_bet(BetType::Red, 1).unwrap();
@@ -1100,10 +1110,7 @@ fn temp_cards_cannot_be_removed_mid_effect_lock_at_spin() {
         "heist_chip",
         0,
         CardType::Money,
-        vec![
-            EffectKind::ActionSurge { chips: 1 },
-            EffectKind::HandOp { kind: HandOp::ExileSelf },
-        ],
+        vec![EffectKind::ActionSurge { chips: 1 }, EffectKind::HandOp { kind: HandOp::ExileSelf }],
     )]);
     let mut state = fresh_battle();
     with_hand(&mut state, &["heist_chip"]);
@@ -1118,7 +1125,12 @@ fn temp_cards_cannot_be_removed_mid_effect_lock_at_spin() {
 
 #[test]
 fn played_cards_file_to_discard_after_spin() {
-    let defs = defs(vec![card("booster", 1, CardType::Payout, vec![EffectKind::GrantChips { amount: 0 }])]);
+    let defs = defs(vec![card(
+        "booster",
+        1,
+        CardType::Payout,
+        vec![EffectKind::GrantChips { amount: 0 }],
+    )]);
     let mut state = fresh_battle();
     with_hand(&mut state, &["booster"]);
     assert!(play(&mut state, 0, &defs));
@@ -1165,17 +1177,14 @@ fn fight_scope_entries_survive_spin_and_round_tick() {
 fn rewriter_deal_damage_variants() {
     let m = CombatMode::Points;
     assert_eq!(
-        format_description("Red bets deal 2.5x damage instead of 2.0x for the rest of the fight.", m),
+        format_description(
+            "Red bets deal 2.5x damage instead of 2.0x for the rest of the fight.",
+            m
+        ),
         "Red bets score 2.5x PTS instead of 2.0x for the rest of the fight."
     );
-    assert_eq!(
-        format_description("Deals 3x damage on a win.", m),
-        "Scores 3x PTS on a win."
-    );
-    assert_eq!(
-        format_description("They take 5 dealt damage.", m),
-        "They take 5 scored PTS."
-    );
+    assert_eq!(format_description("Deals 3x damage on a win.", m), "Scores 3x PTS on a win.");
+    assert_eq!(format_description("They take 5 dealt damage.", m), "They take 5 scored PTS.");
 }
 
 #[test]
@@ -1189,10 +1198,7 @@ fn rewriter_enemy_and_flat_damage() {
         format_description("Deals flat damage to the enemy.", m),
         "Scores flat PTS to the enemy."
     );
-    assert_eq!(
-        format_description("Damage taken while stunned.", m),
-        "Points taken while stunned."
-    );
+    assert_eq!(format_description("Damage taken while stunned.", m), "Points taken while stunned.");
     assert_eq!(
         format_description("Damage Dealt per gold slot.", m),
         "Points Scored per gold slot."

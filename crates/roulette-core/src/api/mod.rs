@@ -11,7 +11,9 @@ use std::sync::Arc;
 
 use roulette_content::schema::SlotColor;
 
-use crate::battle::state::{ActionError, BattleOutcome, BattlePhase, BattleState, SpinInput, SpinOutcome};
+use crate::battle::state::{
+    ActionError, BattleOutcome, BattlePhase, BattleState, SpinInput, SpinOutcome,
+};
 use crate::bets::BetType;
 use crate::phys::{PhysicsModifiers, Simulator, WheelLayout};
 use crate::rng::Rng;
@@ -28,15 +30,29 @@ pub use events::EngineEvent;
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum Command {
-    StartRun { difficulty: Difficulty },
-    DraftCard { card_id: String },
+    StartRun {
+        difficulty: Difficulty,
+    },
+    DraftCard {
+        card_id: String,
+    },
     DraftWheel,
     FinishLoadout,
-    PickNode { node_id: String },
-    PlayCard { hand_index: usize },
+    PickNode {
+        node_id: String,
+    },
+    PlayCard {
+        hand_index: usize,
+    },
     BuyDraw,
-    PlaceBet { bet: BetType, amount: u16 },
-    RemoveBet { bet: BetType, amount: u16 },
+    PlaceBet {
+        bet: BetType,
+        amount: u16,
+    },
+    RemoveBet {
+        bet: BetType,
+        amount: u16,
+    },
     ClearBets,
     Rebet,
     Sacrifice,
@@ -44,15 +60,25 @@ pub enum Command {
     Predict,
     /// Spin the player's wheel and let the enemy answer; ends the round.
     Spin,
-    Purchase { item_index: usize },
-    ForgeTake { op_index: usize },
+    Purchase {
+        item_index: usize,
+    },
+    ForgeTake {
+        op_index: usize,
+    },
     ForgeReroll,
-    EventChoose { choice_id: String },
+    EventChoose {
+        choice_id: String,
+    },
     /// Wheel customizer color level-up (§4.5) at the forge.
-    BuyLevel { color: SlotColor },
+    BuyLevel {
+        color: SlotColor,
+    },
     /// §4.8 wheel customizer: edit a draft clone of the player's wheel, then
     /// `Save` (commit) or `Cancel` (discard). Only valid at the forge.
-    Customize { op: CustomizeOp },
+    Customize {
+        op: CustomizeOp,
+    },
     /// Undo the last applied command (snapshot restore, REQ-009).
     Undo,
 }
@@ -113,8 +139,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(content: Arc<roulette_content::schema::Content>, seed: &str) -> Self {
-        let card_defs =
-            content.cards.iter().map(|c| (c.id.clone(), c.clone())).collect();
+        let card_defs = content.cards.iter().map(|c| (c.id.clone(), c.clone())).collect();
         Self {
             content,
             seed: seed.to_string(),
@@ -248,14 +273,18 @@ impl Engine {
                     let (cost, defs, mut rng) = {
                         let battle = self.battle.as_ref().ok_or(EngineError::NotInBattle)?;
                         let cost = battle.hand.get(*hand_index).and_then(|c| {
-                            c.cost_override.or_else(|| self.card_defs.get(&c.def_id).map(|d| d.cost))
+                            c.cost_override
+                                .or_else(|| self.card_defs.get(&c.def_id).map(|d| d.cost))
                         });
                         (cost, self.card_defs.clone(), self.next_effect_rng())
                     };
                     let battle = self.battle.as_mut().ok_or(EngineError::NotInBattle)?;
                     let mut ctx = crate::cards::effects::EffectCtx { defs: &defs, rng: &mut rng };
-                    let played =
-                        crate::cards::effects::play_card_with_effects(battle, *hand_index, &mut ctx);
+                    let played = crate::cards::effects::play_card_with_effects(
+                        battle,
+                        *hand_index,
+                        &mut ctx,
+                    );
                     (cost, played)
                 };
                 let def_id = match played {
@@ -278,17 +307,17 @@ impl Engine {
                         ))))
                     }
                 };
-                self.events.push(EngineEvent::CardPlayed { card_id: def_id, cost: cost.unwrap_or(0) as u16 });
+                self.events.push(EngineEvent::CardPlayed {
+                    card_id: def_id,
+                    cost: cost.unwrap_or(0) as u16,
+                });
                 Ok(())
             }
             Command::BuyDraw => {
                 let battle = self.battle_mut()?;
                 let cost = battle.draw_cost();
                 let card = battle.buy_draw().map_err(EngineError::from)?;
-                self.events.push(EngineEvent::DrawBought {
-                    cost,
-                    card_id: card.def_id,
-                });
+                self.events.push(EngineEvent::DrawBought { cost, card_id: card.def_id });
                 Ok(())
             }
             Command::PlaceBet { bet, amount } => {
@@ -324,10 +353,7 @@ impl Engine {
             Command::Predict => self.predict(),
             Command::Spin => self.spin(),
             Command::Purchase { item_index } => {
-                let bought = self
-                    .run_mut()?
-                    .shop_buy(*item_index)
-                    .map_err(EngineError::from)?;
+                let bought = self.run_mut()?.shop_buy(*item_index).map_err(EngineError::from)?;
                 let price = self
                     .run()
                     .and_then(|r| r.shop_offer.as_ref())
@@ -382,10 +408,7 @@ impl Engine {
             Command::BuyLevel { color } => {
                 let run = self.run_mut()?;
                 let new_level = run.buy_color_level(*color).map_err(EngineError::from)?;
-                self.events.push(EngineEvent::ColorLevelBought {
-                    color: *color,
-                    level: new_level,
-                });
+                self.events.push(EngineEvent::ColorLevelBought { color: *color, level: new_level });
                 Ok(())
             }
             Command::Customize { op } => self.customize(op),
@@ -396,13 +419,7 @@ impl Engine {
     /// §4.8 wheel customizer: edits apply to a draft clone; `Save` commits the
     /// draft to the run (and syncs the owned-wheel entry), `Cancel` discards.
     fn customize(&mut self, op: &CustomizeOp) -> Result<(), EngineError> {
-        if self
-            .run
-            .as_ref()
-            .ok_or(EngineError::NoRun)?
-            .state
-            != GameState::Forge
-        {
+        if self.run.as_ref().ok_or(EngineError::NoRun)?.state != GameState::Forge {
             return Err(EngineError::Run(RunError::NotInState(
                 self.run.as_ref().expect("checked above").state,
             )));
@@ -411,18 +428,16 @@ impl Engine {
             CustomizeOp::Save | CustomizeOp::Cancel => None,
             edit => Some(edit),
         } {
-            let mut draft = self.draft_wheel.take().unwrap_or_else(|| {
-                self.run.as_ref().expect("checked above").player_wheel.clone()
-            });
+            let mut draft = self
+                .draft_wheel
+                .take()
+                .unwrap_or_else(|| self.run.as_ref().expect("checked above").player_wheel.clone());
             let result = match edit {
                 CustomizeOp::CycleColor { slot } => {
                     let color = draft.cycle_slot_color(*slot);
                     color
                         .map(|color| {
-                            self.events.push(EngineEvent::SlotColorCycled {
-                                slot: *slot,
-                                color,
-                            })
+                            self.events.push(EngineEvent::SlotColorCycled { slot: *slot, color })
                         })
                         .map_err(|e| e.to_string())
                 }
@@ -473,34 +488,27 @@ impl Engine {
     }
 
     fn start_run(&mut self, difficulty: Difficulty) -> Result<(), EngineError> {
-        let run = crate::run::state::RunState::start_new_run(
-            &self.content,
-            &self.seed,
-            difficulty,
-        );
+        let mut run =
+            crate::run::state::RunState::start_new_run(&self.content, &self.seed, difficulty);
         self.battle_index = 0;
         self.spin_index = 0;
         self.run_rng_calls = 0;
         self.prediction = None;
+        self.draft_wheel = None;
         self.battle = None;
-        self.events.push(EngineEvent::RunStarted {
-            seed: self.seed.clone(),
-            difficulty,
-        });
+        self.events.push(EngineEvent::RunStarted { seed: self.seed.clone(), difficulty });
+        let mut rng = self.next_run_rng();
+        run.open_loadout(&self.content, &mut rng);
         self.run = Some(run);
         Ok(())
     }
 
-    /// After a node is picked: battles are entered immediately, shop/forge/
-    /// event nodes open their screen (offers are rolled lazily by the run
-    /// layer on first purchase/reroll? No — they are rolled in pick_node).
+    /// After a node is picked: battles are entered immediately; shop/forge/
+    /// event nodes open their screen (offers are rolled inside pick_node).
     fn post_pick(&mut self, node_id: &str) -> Result<(), EngineError> {
         let node_type = crate::run::state::node_type_at(self.run.as_ref().unwrap(), node_id)
             .ok_or(EngineError::Content(format!("node {node_id} missing")))?;
-        self.events.push(EngineEvent::NodePicked {
-            id: node_id.to_string(),
-            node_type,
-        });
+        self.events.push(EngineEvent::NodePicked { id: node_id.to_string(), node_type });
         let combat_type = matches!(
             node_type,
             crate::run::map::NodeType::Combat
@@ -508,7 +516,11 @@ impl Engine {
                 | crate::run::map::NodeType::Boss
         );
         let tier = combat_type.then(|| {
-            self.run.as_ref().ok_or(EngineError::NoRun)?.current_node_tier().map_err(EngineError::from)
+            self.run
+                .as_ref()
+                .ok_or(EngineError::NoRun)?
+                .current_node_tier()
+                .map_err(EngineError::from)
         });
         if let Some(tier) = tier {
             let tier = tier?;
@@ -539,12 +551,20 @@ impl Engine {
     /// (green ladder + board converts/swaps), matching `resolve_spin` exactly.
     fn player_layout(&self, battle: &BattleState) -> WheelLayout {
         let wheel = battle.wheel(crate::battle::state::Side::Player);
-        self.layout_for(wheel, battle.player_levels.get(SlotColor::Green), &battle.merged_board(crate::battle::state::Side::Player))
+        self.layout_for(
+            wheel,
+            battle.player_levels.get(SlotColor::Green),
+            &battle.merged_board(crate::battle::state::Side::Player),
+        )
     }
 
     fn enemy_layout(&self, battle: &BattleState) -> WheelLayout {
         let wheel = battle.wheel(crate::battle::state::Side::Enemy);
-        self.layout_for(wheel, battle.enemy_levels.get(SlotColor::Green), &battle.merged_board(crate::battle::state::Side::Enemy))
+        self.layout_for(
+            wheel,
+            battle.enemy_levels.get(SlotColor::Green),
+            &battle.merged_board(crate::battle::state::Side::Enemy),
+        )
     }
 
     fn layout_for(
@@ -627,10 +647,8 @@ impl Engine {
         let Some(p) = prediction else {
             return Err(EngineError::PredictionUnavailable);
         };
-        self.events.push(EngineEvent::PredictionShown {
-            start_slot: p.sector_start,
-            size: p.sector_size,
-        });
+        self.events
+            .push(EngineEvent::PredictionShown { start_slot: p.sector_start, size: p.sector_size });
         self.prediction = Some((p.sector_start, p.sector_size));
         Ok(())
     }
@@ -642,9 +660,8 @@ impl Engine {
             return Err(EngineError::NotInBattle);
         }
         let passed = battle.spin().map_err(EngineError::from)?.is_none();
-        let mut events = vec![EngineEvent::SpinStarted {
-            side: crate::battle::state::Side::Player,
-        }];
+        let mut events =
+            vec![EngineEvent::SpinStarted { side: crate::battle::state::Side::Player }];
         if !passed {
             // Gather sim inputs from immutable views first, then mutate.
             let battle = self.battle.as_ref().ok_or(EngineError::NotInBattle)?;
@@ -653,8 +670,8 @@ impl Engine {
             mods.bias_target_angle = Self::bias_target_angle(battle, &layout);
             let live = self.spin_stream();
             let prediction = self.prediction;
-            let nudge =
-                (mods.nudge_cheat_active && mods.nudge_distance > 0).then_some(mods.nudge_distance as i32);
+            let nudge = (mods.nudge_cheat_active && mods.nudge_distance > 0)
+                .then_some(mods.nudge_distance as i32);
             let battle = self.battle.as_mut().ok_or(EngineError::NotInBattle)?;
             let (_, result) = Simulator::new(layout.clone(), mods, live).run_to_completion(nudge);
             for &slot in &result.slots {
@@ -744,9 +761,8 @@ impl Engine {
         let mut rng = self.next_run_rng();
         let mut run = self.run.take().ok_or(EngineError::NoRun)?;
         let mut battle = self.battle.take().ok_or(EngineError::NotInBattle)?;
-        let result = run
-            .complete_battle(&self.content, &mut battle, &mut rng)
-            .map_err(EngineError::from);
+        let result =
+            run.complete_battle(&self.content, &mut battle, &mut rng).map_err(EngineError::from);
         self.run = Some(run);
         let result = result?;
         events.push(EngineEvent::BattleEnded { result: result.clone().into() });
