@@ -577,12 +577,14 @@
       justify-content: center;
       z-index: 1000;
       opacity: 0;
+      visibility: hidden;
       pointer-events: none;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
     }
 
     .modal-overlay.active {
       opacity: 1;
+      visibility: visible;
       pointer-events: auto;
     }
 
@@ -1016,6 +1018,15 @@
       const betAmount = parseInt(document.getElementById('chip-amount').value) || 10;
       if (betAmount > chips) {
         log('Not enough chips for this bet!', 'loss');
+        if (chips === 0) {
+          // Bankrupt: no legal bet can ever be placed again, so end the encounter
+          // instead of soft-locking the player on the spin button forever.
+          if (currentMode === 'PointRound') {
+            showModal('DEFEAT!', `Bankrupt with ${currentScore} / ${targetScore} PTS. The house always wins.`);
+          } else {
+            showModal('DEFEAT!', 'Out of chips — the Cursed Croupier sweeps the table.');
+          }
+        }
         return;
       }
 
@@ -1193,10 +1204,14 @@
       }
 
       if (show) {
-        document.getElementById('modal-title').textContent = title;
-        document.getElementById('modal-subtitle').textContent = subtitle;
-        document.getElementById('modal').classList.add('active');
+        showModal(title, subtitle);
       }
+    }
+
+    function showModal(title, subtitle) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-subtitle').textContent = subtitle;
+      document.getElementById('modal').classList.add('active');
     }
 
     function resetEncounter() {

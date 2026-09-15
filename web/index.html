@@ -577,12 +577,14 @@
       justify-content: center;
       z-index: 1000;
       opacity: 0;
+      visibility: hidden;
       pointer-events: none;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
     }
 
     .modal-overlay.active {
       opacity: 1;
+      visibility: visible;
       pointer-events: auto;
     }
 
@@ -773,6 +775,7 @@
     </div>
   </main>
 
+  <!-- GAME END MODAL -->
   <div class="modal-overlay" id="modal">
     <div class="modal-card">
       <div class="modal-title" id="modal-title">VICTORY!</div>
@@ -781,6 +784,7 @@
     </div>
   </div>
 
+  <!-- DECK CUSTOMIZER MODAL -->
   <div class="modal-overlay" id="deck-modal">
     <div class="modal-card">
       <div class="modal-title">🎴 Card Library & Deck Customizer</div>
@@ -832,6 +836,7 @@
       slots.push({ number: n, color: redNumbers.includes(n) ? 'Red' : 'Black' });
     }
 
+    // EXPANDED CARD LIBRARY (11 Cards)
     const cardPool = [
       { id: 'red_fever', name: 'Red Fever', cost: 1, desc: '+0.5x payout to Red bets this turn.', type: 'RouletteModifier', mode: 'all' },
       { id: 'black_fever', name: 'Black Fever', cost: 1, desc: '+0.5x payout to Black bets this turn.', type: 'RouletteModifier', mode: 'all' },
@@ -1013,6 +1018,15 @@
       const betAmount = parseInt(document.getElementById('chip-amount').value) || 10;
       if (betAmount > chips) {
         log('Not enough chips for this bet!', 'loss');
+        if (chips === 0) {
+          // Bankrupt: no legal bet can ever be placed again, so end the encounter
+          // instead of soft-locking the player on the spin button forever.
+          if (currentMode === 'PointRound') {
+            showModal('DEFEAT!', `Bankrupt with ${currentScore} / ${targetScore} PTS. The house always wins.`);
+          } else {
+            showModal('DEFEAT!', 'Out of chips — the Cursed Croupier sweeps the table.');
+          }
+        }
         return;
       }
 
@@ -1052,6 +1066,7 @@
         }
       });
 
+      // Remove played cards and auto-refill hand
       hand = hand.filter((_, idx) => !selectedCards.has(idx));
       selectedCards.clear();
 
@@ -1096,7 +1111,7 @@
           if (selectedBetType === 'Odd' && targetSlot.number !== 0 && targetSlot.number % 2 !== 0) win = true;
           if (selectedBetType === 'High' && targetSlot.number >= 19) win = true;
           if (selectedBetType === 'Low' && targetSlot.number >= 1 && targetSlot.number <= 18) win = true;
-          if (targetSlot.color === 'Gold') win = true;
+          if (targetSlot.color === 'Gold') win = true; // Gold Jackpot slot wins!
 
           if (win) {
             let mult = (selectedBetType === 'Green' ? 14.0 : 2.0);
@@ -1189,10 +1204,14 @@
       }
 
       if (show) {
-        document.getElementById('modal-title').textContent = title;
-        document.getElementById('modal-subtitle').textContent = subtitle;
-        document.getElementById('modal').classList.add('active');
+        showModal(title, subtitle);
       }
+    }
+
+    function showModal(title, subtitle) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-subtitle').textContent = subtitle;
+      document.getElementById('modal').classList.add('active');
     }
 
     function resetEncounter() {
