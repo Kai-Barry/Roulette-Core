@@ -278,6 +278,14 @@ impl BattleState {
             Side::Enemy => self.enemy_bets.clear(),
         }
 
+        // Synapse Link (§4.5 green unlock): any green landing on the player's
+        // spin grants a free card next turn. Blueprint gives no exact numbers;
+        // +1 per landing spin (tuning is a Phase 9 balance pass).
+        if side == Side::Player && any_green && wheel.unlocked_abilities.contains(&SlotColor::Green)
+        {
+            self.free_cards_next_turn = self.free_cards_next_turn.saturating_add(1);
+        }
+
         let outcome = SpinOutcome {
             side,
             landed: input.landed,

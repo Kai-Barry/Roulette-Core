@@ -11,6 +11,7 @@ pub mod cards;
 pub mod deterministic_floats;
 pub mod phys;
 pub mod rng;
+pub mod run;
 pub mod wheel;
 
 pub use rng::Rng;
