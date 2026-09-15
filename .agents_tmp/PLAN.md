@@ -133,12 +133,12 @@ Phases are ordered by dependency. Phase 0 establishes the workspace; each later 
 
 | Task | Description | Completed | Date |
 |---|---|---|---|
-| TASK-018 | Implement `WheelConfig` runtime struct (cloneable, serde) from `WheelDef`: numbers, colors, `payout_multipliers { red, black, green, number, odd, even, gold?, purple?, cyan?, crimson? }`, upgrades; `effective_color(number, board)` honoring converts/paint/custom colors (§10.1 step 1) | | |
-| TASK-019 | Implement `Bet { bet_type, amount }` with `BetType { Red, Black, Green, Number(u32), Odd, Even, Dozen(u8), Column(u8), Gold, Purple, Cyan, Crimson }` and win-check vs effective color/number incl. mirror-slot and extra-green ladder (32 @ ≥1; 11,22 @ ≥2; 5,17,29 @ ≥4, §4.4); payout base table from wheel config (2/2/14/36 defaults; 3× dozen/column; 4/4/4/6 specials, §4.2) | | |
-| TASK-020 | Implement `BoardModifiers` (serde struct, §16.3): customNumberMultipliers, convert lists, zone marks, globalMultiplier, streak counters/flags, insurance/riskCapital/goldenHeist/emeraldForest flags, doubleNextPayout — populated by `ModifierStack` entries, not loose booleans | | |
-| TASK-021 | Implement `ModifierStack`: `push(entry { source_card, kind, remaining_spins })`, `tick_at_round_end()`, typed `query()` accessors consumed by the damage pipeline; paint cards keep `marked_slots` on card instances (§6.3 note) | | |
-| TASK-022 | Implement wheel customizer ops (§4.8): cycle slot color, add/remove slot (≥ 2 enforced), set unique number, save/cancel; board-upgrade application (§4.7: multiplier boosts, add green, converts, lucky_seven heal, light_ball/heavy_friction physics mods, ability unlocks) | | |
-| TASK-023 | Tests: effective color precedence (convert > paint > base); green ladder; bet win matrix vs §4.2; customizer invariants (≥ 2 slots, unique numbers) | | |
+| TASK-018 | Implement `WheelConfig` runtime struct (cloneable, serde) from `WheelDef`: numbers, colors, `payout_multipliers { red, black, green, number, odd, even, gold?, purple?, cyan?, crimson? }`, upgrades; `effective_color(number, board)` honoring converts/paint/custom colors (§10.1 step 1) | | ✅ |
+| TASK-019 | Implement `Bet { bet_type, amount }` with `BetType { Red, Black, Green, Number(u32), Odd, Even, Dozen(u8), Column(u8), Gold, Purple, Cyan, Crimson }` and win-check vs effective color/number incl. mirror-slot and extra-green ladder (32 @ ≥1; 11,22 @ ≥2; 5,17,29 @ ≥4, §4.4); payout base table from wheel config (2/2/14/36 defaults; 3× dozen/column; 4/4/4/6 specials, §4.2) | | ✅ |
+| TASK-020 | ✅ `BoardModifiers` (serde struct, §16.3): customNumberMultipliers, convert lists, zone marks, globalMultiplier, streak counters/flags, insurance/riskCapital/goldenHeist/emeraldForest flags, doubleNextPayout — populated by `ModifierStack` entries, not loose booleans | | ✅ |
+| TASK-021 | ✅ `ModifierStack`: `push(entry { source_card, kind, remaining_spins })`, `tick_at_round_end()`, typed `query()` accessors consumed by the damage pipeline; paint cards keep `marked_slots` on card instances (§6.3 note) | | ✅ |
+| TASK-022 | Implement wheel customizer ops (§4.8): cycle slot color, add/remove slot (≥ 2 enforced), set unique number, save/cancel; board-upgrade application (§4.7: multiplier boosts, add green, converts, lucky_seven heal, light_ball/heavy_friction physics mods, ability unlocks) | | ✅ |
+| TASK-023 | Tests: effective color precedence (convert > paint > base); green ladder; bet win matrix vs §4.2; customizer invariants (≥ 2 slots, unique numbers) | | ✅ |
 
 ## Phase 4 — Battle engine & the §10 damage pipeline
 

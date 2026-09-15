@@ -141,7 +141,7 @@ pub enum PayoutTarget {
 }
 
 /// Zone-mark vocabulary (§6.2 `boardModifiers` zone lists).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ZoneKind {
     Lucky,
