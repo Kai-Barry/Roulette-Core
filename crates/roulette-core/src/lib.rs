@@ -4,6 +4,7 @@
 //! them is the typed effect DSL in `cards::effects`. See `ARCHITECTURE.md` and
 //! `docs/ROULETTE_OS_GAME_BLUEPRINT.md` for the normative specifications.
 
+pub mod battle;
 pub mod bets;
 pub mod board;
 pub mod deterministic_floats;

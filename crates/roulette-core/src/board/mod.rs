@@ -12,7 +12,7 @@ use roulette_content::schema::{PayoutTarget, SlotColor, ZoneKind};
 use serde::{Deserialize, Serialize};
 
 /// Which payout-table column a [`ModifierKind::PayoutMult`] targets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MultTarget {
     Red,
@@ -151,6 +151,8 @@ pub struct BoardModifiers {
     pub zone_values: BTreeMap<(ZoneKind, u32), u16>,
     /// LUCKY_INDEX-style global damage multiplier (folded product, base 1.0).
     pub global_multiplier: f32,
+    /// Card-armed payout boosts folded by target (GREEN_GREED ×50 etc.).
+    pub payout_multipliers: BTreeMap<MultTarget, f32>,
     // --- battle-owned streak state (§10.3) ---
     pub red_streak_count: u8,
     pub black_streak_count: u8,
@@ -166,6 +168,18 @@ pub struct BoardModifiers {
     pub double_next_payout: bool,
     /// LUCKY_CHARM rerolls currently available.
     pub lucky_charms: u8,
+    /// TURBO_SPIN ×1.5 (consumed by the pipeline).
+    pub turbo_active: bool,
+    /// Omniscience ×3 when the ball lands in the prediction sector.
+    pub omniscience_active: bool,
+    /// GREEN_RIPPLE: +5 × green slots on the green multiplier.
+    pub green_ripple_active: bool,
+    /// HEAVY_NUDGE armed: all-zero spin → +15 chips (§10.4).
+    pub heavy_nudge_armed: bool,
+    /// STUN_STRIKE armed: ≥5 damage this turn → +2 stun (§10.4).
+    pub stun_strike_armed: bool,
+    /// BLOCK_RED intent: red bets voided on the next spin (§7.2).
+    pub block_red_active: bool,
 }
 
 impl BoardModifiers {
@@ -183,6 +197,12 @@ impl BoardModifiers {
     /// Zone payload for a slot (0 when the mark carries no value).
     pub fn zone_value(&self, kind: ZoneKind, slot: u32) -> u16 {
         *self.zone_values.get(&(kind, slot)).unwrap_or(&0)
+    }
+
+    /// Folded card-armed payout multiplier for a target (§10.1 step 3 zone
+    /// multipliers from the card arms HIGH/LOW/dozen/column/prime).
+    pub fn payout_multiplier_for(&self, target: &MultTarget) -> f32 {
+        self.payout_multipliers.get(target).copied().unwrap_or(1.0)
     }
 }
 
@@ -264,6 +284,13 @@ impl ModifierStack {
     /// pipeline. Converts are applied after paints so convert > paint (TASK-023).
     pub fn snapshot(&self) -> BoardModifiers {
         let mut board = BoardModifiers { global_multiplier: 1.0, ..BoardModifiers::default() };
+        self.fold_into(&mut board);
+        board
+    }
+
+    /// Folds the stack's entries on top of an existing board (the battle
+    /// pipeline starts from the battle-owned board and adds card arms).
+    pub fn fold_into(&self, board: &mut BoardModifiers) {
         // Paint (Round/Spin) first, converts (Fight) second — later layer wins.
         for entry in &self.entries {
             if let ModifierKind::ConvertSlots { to, numbers } = &entry.kind {
@@ -286,7 +313,9 @@ impl ModifierStack {
         }
         for entry in &self.entries {
             match &entry.kind {
-                ModifierKind::PayoutMult { .. } => {} // queried via payout_mult()
+                ModifierKind::PayoutMult { target, mult } => {
+                    *board.payout_multipliers.entry(*target).or_insert(1.0) *= mult;
+                }
                 ModifierKind::CustomNumberMult { numbers, mult } => {
                     for &n in numbers {
                         *board.custom_number_multipliers.entry(n).or_insert(1.0) *= mult;
@@ -322,7 +351,6 @@ impl ModifierStack {
                 ModifierKind::LuckyCharm => board.lucky_charms += 1,
             }
         }
-        board
     }
 
     /// Total payout multiplier targeting `target` from all live entries
