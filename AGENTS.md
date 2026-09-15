@@ -64,3 +64,15 @@ Principle: *content is data (RON), mechanics are code, seam is a typed EffectKin
 - Round end: `end_round()` ticks Round-scope modifiers, applies Curse of Blood,
   compares pools at the limit; tie → sudden death extra rounds.
 - Reward rolls (§2.5) deferred to run layer (Phase 6).
+
+## Phase 5 (GOAL-006) notes — card effect execution via typed DSL
+- `cards/` module: `format.rs` (§6.5 points-mode rewrite; **`PTS` is an invariant acronym — never recased to lowercase**), `effects.rs` (typed DSL dispatch), `mod.rs` (hooks).
+- Hook seams: `on_play_card` (per effect, ordered), `after_spin_resolve` (file played cards to discard, temp→exile, clear spin-scoped stack entries, tick Spins, expire board arms + reset physics), `on_round_end` (CapitalVenture banks ONLY on round win, then clears).
+- `resolve_spin` is snapshot-based: `merged_board(side)` folds the stack into a local board; **write-back must carry ONLY battle-owned fields** (streak counts, block_red, stun_strike, heavy_nudge, insurance, double_next_payout). Writing the folded board back double-applies stack arms on the next spin (36-vs-12 bug class).
+- HEAT COMBO heat multiplier writes `player_board.payout_multipliers` directly (battle-owned) and reverts on streak reset.
+- Bet arms: Red/Black/Odd/Even/Dozen/Column **and Green** fold `payout_multiplier_for`; `effective_color` applies `swap_red_black` LAST (red↔black only, after all converts).
+- `ModifierStack` scoping (§6.3): `Spins(n)` ticks **per spin** via `tick_after_spin` ("next N spins"), `Round` clears via `tick_at_round_end`, `Spin`/`NextWin` via `clear_spin_scoped`. Converts land in the paint layer unless fight-scope (fight-scope ones also into `converts`).
+- `AddGreenSlot` ignores numbers not on the wheel (no phantom slots). `Rng::range_usize(min, max)` is INCLUSIVE of max.
+- Landed side effects (§10.2): gold = +15 PTS + gold adjacent + heist; 12 is canonical red (CANONICAL_RED table in wheel/mod.rs) — bet math in tests must use it.
+- Card costs charge before effects (`pay_card_cost` → `on_play_card`); percent gains resolve on the post-cost pool. Played cards sit on `active_played` (the felt) until spin end — never assert discard membership at play time.
+- Status: **142 tests / 0 failures / 0 clippy warnings** across workspace; commit 0664360 on main. Next: Phase 6 (run layer: reward rolls §2.5, progression).
