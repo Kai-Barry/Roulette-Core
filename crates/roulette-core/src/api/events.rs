@@ -5,7 +5,7 @@ use crate::battle::state::Side;
 use crate::bets::BetType;
 use crate::run::map::NodeType;
 use crate::run::state::{Difficulty, GameState};
-use roulette_content::schema::{EnemyTier, SlotColor};
+use roulette_content::schema::{EnemyAction, EnemyTier, SlotColor};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
@@ -59,11 +59,26 @@ pub enum EngineEvent {
         insurance_refund: u16,
         all_lost: bool,
     },
-    IntentExecuted,
+    /// Observability (design-audit B4): the house's bets, emitted before its
+    /// `spin_resolved` so pool swings are attributable from events alone.
+    EnemyBetPlaced {
+        bet: BetType,
+        amount: u16,
+    },
+    /// Observability (design-audit B5): carries the executed intent so the
+    /// HP cost is explainable (REQ-005 AI + §3.6 intent telegraph).
+    IntentExecuted {
+        action: EnemyAction,
+        value: u16,
+        description: String,
+    },
     RoundEnded {
         round: u32,
         player_pts: u16,
         enemy_pts: u16,
+        /// Player HP delta this round (intents + curse blood; ≤0 normally).
+        /// Design-audit B6: makes the real punishment currency legible.
+        hp_delta: i16,
         outcome: RoundOutcome,
     },
     BattleEnded {
@@ -82,9 +97,15 @@ pub enum EngineEvent {
         item: usize,
         price: u16,
     },
-    CardGained { id: String },
-    WheelGained { id: String },
-    Healed { hp: u16 },
+    CardGained {
+        id: String,
+    },
+    WheelGained {
+        id: String,
+    },
+    Healed {
+        hp: u16,
+    },
     ForgeApplied {
         op: usize,
     },

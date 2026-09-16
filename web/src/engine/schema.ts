@@ -24,12 +24,12 @@ export const EVENT_TAGS = [
   'run_started', 'node_picked', 'battle_started', 'card_played', 'draw_bought',
   'bet_placed', 'bet_removed', 'bets_cleared', 'rebet', 'sacrificed',
   'prediction_shown', 'spin_started', 'ball_landed', 'spin_resolved',
-  'intent_executed', 'round_ended', 'battle_ended', 'node_completed',
-  'node_failed', 'reward_cards', 'chips_changed', 'purchased', 'card_gained',
-  'wheel_gained', 'healed', 'forge_applied', 'forge_rerolled', 'event_chosen',
-  'color_level_bought', 'slot_color_cycled', 'slot_added', 'slot_removed',
-  'slot_number_set', 'wheel_saved', 'wheel_cancelled', 'game_over',
-  'run_victory', 'undone',
+  'enemy_bet_placed', 'intent_executed', 'round_ended', 'battle_ended',
+  'node_completed', 'node_failed', 'reward_cards', 'chips_changed', 'purchased',
+  'card_gained', 'wheel_gained', 'healed', 'forge_applied', 'forge_rerolled',
+  'event_chosen', 'color_level_bought', 'slot_color_cycled', 'slot_added',
+  'slot_removed', 'slot_number_set', 'wheel_saved', 'wheel_cancelled',
+  'game_over', 'run_victory', 'undone',
 ] as const;
 
 export type CommandTag = (typeof COMMAND_TAGS)[number];
@@ -105,8 +105,12 @@ export type EngineEvent =
   | { event: 'spin_started'; side: Side }
   | { event: 'ball_landed'; side: Side; number: number }
   | { event: 'spin_resolved'; side: Side; pts: number; insurance_refund: number; all_lost: boolean }
-  | { event: 'intent_executed' }
-  | { event: 'round_ended'; round: number; player_pts: number; enemy_pts: number; outcome: RoundOutcome }
+  | { event: 'enemy_bet_placed'; bet: BetType; amount: number }
+  | { event: 'intent_executed'; action: string; value: number; description: string }
+  | {
+      event: 'round_ended'; round: number; player_pts: number; enemy_pts: number;
+      hp_delta: number; outcome: RoundOutcome;
+    }
   | { event: 'battle_ended'; result: BattleResultEvent }
   | { event: 'node_completed' }
   | { event: 'node_failed' }

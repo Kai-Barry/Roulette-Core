@@ -147,6 +147,9 @@ pub struct BattleState {
     pub round: u32,
     pub max_rounds: u32,
     pub is_sudden_death: bool,
+    /// Extra rounds played since sudden death began (tie-loop cap, B3b).
+    #[serde(default)]
+    pub sudden_death_rounds: u32,
     pub phase: BattlePhase,
     /// Whose wheel is being spun / bets resolved (§3.2 turn flow).
     pub active_wheel_owner: Side,
@@ -174,6 +177,15 @@ pub struct BattleState {
     // --- bets ---
     pub bets: Vec<Bet>,
     pub enemy_bets: Vec<Bet>,
+    /// Observability (design-audit B4): the enemy's bets for its LAST spin.
+    /// `enemy_bets` is cleared at resolve; this snapshot survives it so the
+    /// event stream / UI can attribute enemy pool swings.
+    #[serde(default)]
+    pub last_enemy_bets: Vec<Bet>,
+    /// Observability (design-audit B5): the intent executed on the enemy's
+    /// last spin, if any. Cleared at the start of every enemy turn.
+    #[serde(default)]
+    pub last_executed_intent: Option<EnemyIntent>,
     /// REBET backup (§3.4: backed up on clear).
     pub rebet_backup: Vec<Bet>,
 
@@ -275,6 +287,7 @@ impl BattleState {
             round: 1,
             max_rounds,
             is_sudden_death: false,
+            sudden_death_rounds: 0,
             phase: BattlePhase::Betting,
             active_wheel_owner: Side::Player,
             turn: Side::Player,
@@ -293,6 +306,8 @@ impl BattleState {
             free_cards_active: 0,
             bets: Vec::new(),
             enemy_bets: Vec::new(),
+            last_enemy_bets: Vec::new(),
+            last_executed_intent: None,
             rebet_backup: Vec::new(),
             player_wheel,
             enemy_wheel,

@@ -559,6 +559,20 @@ fn enemy_attack_intent_damages_player_on_win() {
     state.execute_enemy_intent();
     assert_eq!(state.player_hp, 50 - 7, "intent executed on winning spin");
     assert!(state.enemy_intent.is_none(), "intent consumed");
+    // Observability (B5): the executed intent is retained for the event payload.
+    assert_eq!(state.last_executed_intent.as_ref().map(|i| i.value), Some(7));
+}
+
+#[test]
+fn enemy_turn_stashes_bets_and_clears_intent_on_loss() {
+    let mut state = test_battle(no_curses());
+    state.enemy_difficulty = 1.0;
+    let mut rng = Rng::new(77);
+    // All-lose landing → intent must NOT execute; bets must still be stashed.
+    state.enemy_take_turn(&mut rng, 0);
+    assert!(state.last_executed_intent.is_none(), "losing spin executes nothing");
+    assert!(!state.last_enemy_bets.is_empty(), "enemy bets observable even on a miss (B4)");
+    assert!(state.enemy_bets.is_empty(), "live enemy_bets still clear at resolve");
 }
 
 #[test]
@@ -626,6 +640,58 @@ fn tie_at_limit_triggers_sudden_death() {
 }
 
 #[test]
+fn sudden_death_tie_loop_is_capped() {
+    // Mirrored same-type betting must not tie forever (design-audit B3b):
+    // after SUDDEN_DEATH_MAX_ROUNDS extra rounds the house edge decides.
+    let mut state = test_battle(no_curses());
+    state.round = 3;
+    state.chips_pool = 30;
+    state.enemy_chips_pool = 30;
+    let mut outcomes = Vec::new();
+    for _ in 0..10 {
+        let o = state.end_round();
+        if o != BattleOutcome::SuddenDeath {
+            outcomes.push(o);
+            break;
+        }
+    }
+    assert_eq!(outcomes, vec![BattleOutcome::PlayerDefeat], "tie loop terminates");
+    assert!(state.round <= 6, "no runaway rounds: {}", state.round);
+}
+
+#[test]
+fn sudden_death_tie_resolved_when_pools_diverge() {
+    // A sudden-death round that breaks the tie must still score normally.
+    let mut state = test_battle(no_curses());
+    state.round = 3;
+    state.chips_pool = 30;
+    state.enemy_chips_pool = 30;
+    assert_eq!(state.end_round(), BattleOutcome::SuddenDeath);
+    state.round = 4;
+    state.chips_pool = 31; // player edges ahead during the extra round
+    assert_eq!(state.end_round(), BattleOutcome::PlayerVictory);
+}
+
+#[test]
+fn enemy_commit_is_anti_snowballed() {
+    // Design-audit B2: commitment must NOT grow with the enemy pool once it
+    // is ahead — the stake bank is bounded by the player's pool.
+    let state_at = |enemy_pool: u16| {
+        let mut state = test_battle(no_curses());
+        state.enemy_difficulty = 1.0;
+        state.enemy_chips_pool = enemy_pool;
+        state.chips_pool = 30;
+        let stakes = state.enemy_choose_bets(&mut Rng::new(42));
+        stakes.iter().map(|&(_, a)| a).sum::<u16>()
+    };
+    let small = state_at(40);
+    let big = state_at(400);
+    assert!(big <= small + 10, "commit must not balloon: small={small} big={big}");
+    let commit = state_at(400);
+    assert!(commit <= 30, "commit capped by player pool: {commit}");
+}
+
+#[test]
 fn curse_of_blood_drains_two_hp_per_round() {
     let mut state = test_battle(vec![curse(CurseEffect::HpLossPerRound(2))]);
     state.round = 1;
@@ -683,5 +749,31 @@ fn golden_battle_replay_is_identical() {
         trace
     };
     assert_eq!(run(424242), run(424242), "same seed → identical trace");
-    assert_ne!(run(424242), run(99), "different seed → different trace");
+
+    // Seed sensitivity (REQ-006 RNG wiring): with several equally-ranked
+    // viable lines and difficulty 0 (always the random-fallback branch),
+    // different seeds must diverge. On the 13-slot wheel the honest-EV AI
+    // (12/13 dozen is uniquely best) plays deterministically — a legal
+    // outcome, so divergence is sampled on a 24-slot double-dozen wheel.
+    let mut wide = enemy_wheel();
+    wide.numbers = (1..=24).collect();
+    wide.green_numbers = Vec::new();
+    let divergent = |seed: u32| {
+        let mut state = test_battle(no_curses());
+        state.enemy_wheel = wide.clone();
+        state.enemy_difficulty = 0.0;
+        let mut rng = Rng::new(seed).derive("battle");
+        let mut trace = String::new();
+        for round in 0..3 {
+            state.begin_betting(Side::Player);
+            let enemy_landed = [2u32, 9, 12, 4, 8, 1][(round * 2 + 1) % 6];
+            let out = state.enemy_take_turn(&mut rng, enemy_landed);
+            trace += &format!("r{} e={:?}\n", round, out.map(|o| o.total_payout));
+            state.end_round();
+        }
+        trace
+    };
+    let traces: std::collections::HashSet<String> =
+        (0..12).map(|i| divergent(424242 + i * 7919)).collect();
+    assert!(traces.len() >= 2, "different seeds → divergent enemy traces");
 }

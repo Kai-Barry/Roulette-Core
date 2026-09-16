@@ -246,8 +246,7 @@ impl Engine {
             return None;
         }
         let ball_count = tele.frames[0].ball_angles.len();
-        let mut out =
-            Vec::with_capacity(12 + tele.frames.len() * 4 * (1 + ball_count));
+        let mut out = Vec::with_capacity(12 + tele.frames.len() * 4 * (1 + ball_count));
         out.extend_from_slice(&(tele.frames.len() as u32).to_le_bytes());
         out.extend_from_slice(&(ball_count as u32).to_le_bytes());
         out.extend_from_slice(&tele.slot_count.to_le_bytes());
@@ -285,7 +284,7 @@ impl Engine {
             event: &'a crate::phys::events::SimEvent,
         }
         let timed: Vec<Timed> = evs.iter().map(|(f, e)| Timed { frame: *f, event: e }).collect();
-        Some(serde_json::to_string(&timed).ok()?)
+        serde_json::to_string(&timed).ok()
     }
 
     // -- command dispatch ----------------------------------------------------
@@ -809,11 +808,14 @@ impl Engine {
                     (r, frames, evs)
                 };
                 self.spin_frames.retain(|(s, _)| *s != crate::battle::state::Side::Player);
-                self.spin_frames.push((crate::battle::state::Side::Player, SpinTelemetry {
-                    slot_count: layout.len() as u32,
-                    slot_width: layout.slot_width,
-                    frames,
-                }));
+                self.spin_frames.push((
+                    crate::battle::state::Side::Player,
+                    SpinTelemetry {
+                        slot_count: layout.len() as u32,
+                        slot_width: layout.slot_width,
+                        frames,
+                    },
+                ));
                 self.spin_sim_events.retain(|(s, _)| *s != crate::battle::state::Side::Player);
                 self.spin_sim_events.push((crate::battle::state::Side::Player, sim_evs));
                 result
@@ -864,11 +866,14 @@ impl Engine {
                     (r, frames, evs)
                 };
                 self.spin_frames.retain(|(s, _)| *s != crate::battle::state::Side::Enemy);
-                self.spin_frames.push((crate::battle::state::Side::Enemy, SpinTelemetry {
-                    slot_count: layout.len() as u32,
-                    slot_width: layout.slot_width,
-                    frames,
-                }));
+                self.spin_frames.push((
+                    crate::battle::state::Side::Enemy,
+                    SpinTelemetry {
+                        slot_count: layout.len() as u32,
+                        slot_width: layout.slot_width,
+                        frames,
+                    },
+                ));
                 self.spin_sim_events.retain(|(s, _)| *s != crate::battle::state::Side::Enemy);
                 self.spin_sim_events.push((crate::battle::state::Side::Enemy, sim_evs));
                 result
@@ -885,8 +890,19 @@ impl Engine {
         let battle = self.battle.as_mut().ok_or(EngineError::NotInBattle)?;
         let intent = battle.enemy_take_turn(&mut rng, enemy);
         if let Some(outcome) = &intent {
+            // Observability (B4): the house's bets precede its resolve so the
+            // pool swing is attributable from events alone.
+            for bet in &battle.last_enemy_bets {
+                events.push(EngineEvent::EnemyBetPlaced { bet: bet.bet_type, amount: bet.amount });
+            }
             events.extend(Self::spin_resolved_events(crate::battle::state::Side::Enemy, outcome));
-            events.push(EngineEvent::IntentExecuted);
+            if let Some(executed) = &battle.last_executed_intent {
+                events.push(EngineEvent::IntentExecuted {
+                    action: executed.action,
+                    value: executed.value,
+                    description: executed.description.clone(),
+                });
+            }
         }
         let battle = self.battle.as_mut().ok_or(EngineError::NotInBattle)?;
         // When the enemy was stunned, `enemy_take_turn` already handed the
@@ -899,12 +915,14 @@ impl Engine {
         self.spin_index += 1;
 
         // 3. Round end --------------------------------------------------------
+        let hp_before = battle.player_hp;
         let outcome = battle.end_round();
         let battle = self.battle.as_ref().ok_or(EngineError::NotInBattle)?;
         events.push(EngineEvent::RoundEnded {
             round: battle.round,
             player_pts: battle.chips_pool,
             enemy_pts: battle.enemy_chips_pool,
+            hp_delta: battle.player_hp as i16 - hp_before as i16,
             outcome: outcome.into(),
         });
         match outcome {

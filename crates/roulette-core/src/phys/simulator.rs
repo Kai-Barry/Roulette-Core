@@ -378,7 +378,10 @@ impl Simulator {
             let ev = self.step();
             all_events.extend(ev);
             #[cfg(feature = "telemetry")]
-            self.frames.push(TelemetryFrame { wheel_angle: self.wheel_angle, ball_angles: self.balls.iter().map(|b| b.angle).collect() });
+            self.frames.push(TelemetryFrame {
+                wheel_angle: self.wheel_angle,
+                ball_angles: self.balls.iter().map(|b| b.angle).collect(),
+            });
         }
         if let Some(dir) = nudge_toward {
             self.apply_nudge(dir);
@@ -415,7 +418,10 @@ impl Simulator {
             let ev = self.step();
             let frame = self.frames.len() as u32;
             all_events.extend(ev.into_iter().map(|e| (frame, e)));
-            self.frames.push(TelemetryFrame { wheel_angle: self.wheel_angle, ball_angles: self.balls.iter().map(|b| b.angle).collect() });
+            self.frames.push(TelemetryFrame {
+                wheel_angle: self.wheel_angle,
+                ball_angles: self.balls.iter().map(|b| b.angle).collect(),
+            });
         }
         if let Some(dir) = nudge_toward {
             self.apply_nudge(dir);

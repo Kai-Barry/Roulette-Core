@@ -5,8 +5,8 @@
 
 #![cfg(feature = "telemetry")]
 
-use roulette_core::api::{Command, Engine, SpinSampling};
 use roulette_content::Content;
+use roulette_core::api::{Command, Engine, SpinSampling};
 use std::sync::Arc;
 
 /// Little-endian f32 read.
@@ -16,7 +16,9 @@ fn f32_at(bytes: &[u8], idx: usize) -> f32 {
 
 /// Header: frame_count u32, ball_count u32, slot_count u32, slot_width f32.
 /// All indices below are in 4-byte words (f32_at units).
-fn parse(bytes: &[u8]) -> (u32, u32, u32, f32, Vec<(f32, Vec<f32>)>) {
+type ParsedTelemetry = (u32, u32, u32, f32, Vec<(f32, Vec<f32>)>);
+
+fn parse(bytes: &[u8]) -> ParsedTelemetry {
     let frame_count = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
     let ball_count = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
     let slot_count = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
@@ -51,7 +53,9 @@ fn settled_slot(last_wheel: f32, ball: f32, slot_count: u32, slot_width: f32) ->
 fn telemetry_final_frame_agrees_with_ball_landed() {
     let content: Arc<Content> = Arc::new(Content::embedded().expect("embedded content"));
     let mut engine = Engine::new(content.clone(), "telemetry-agree");
-    engine.apply(&Command::StartRun { difficulty: roulette_core::run::state::Difficulty::Short }).expect("start");
+    engine
+        .apply(&Command::StartRun { difficulty: roulette_core::run::state::Difficulty::Short })
+        .expect("start");
     // Fast-forward the loadout draft to reach combat.
     let offer = engine.run().and_then(|r| r.loadout_offer.clone()).expect("offer");
     for id in &offer.card_ids {
@@ -93,7 +97,11 @@ fn telemetry_final_frame_agrees_with_ball_landed() {
             Some(G::Victory) | Some(G::GameOver) => {
                 assert!(run_restarts < 10, "too many run restarts");
                 run_restarts += 1;
-                engine.apply(&Command::StartRun { difficulty: roulette_core::run::state::Difficulty::Short }).expect("restart");
+                engine
+                    .apply(&Command::StartRun {
+                        difficulty: roulette_core::run::state::Difficulty::Short,
+                    })
+                    .expect("restart");
             }
             Some(G::Combat) => {
                 let battle = engine.battle().cloned().expect("battle");
@@ -151,7 +159,9 @@ fn uniform_mode_has_no_telemetry() {
     let content: Arc<Content> = Arc::new(Content::embedded().expect("embedded content"));
     let mut engine = Engine::new(content, "telemetry-uniform");
     engine.set_spin_sampling(SpinSampling::Uniform);
-    engine.apply(&Command::StartRun { difficulty: roulette_core::run::state::Difficulty::Short }).expect("start");
+    engine
+        .apply(&Command::StartRun { difficulty: roulette_core::run::state::Difficulty::Short })
+        .expect("start");
     let offer = engine.run().and_then(|r| r.loadout_offer.clone()).expect("offer");
     for id in &offer.card_ids {
         let _ = engine.apply(&Command::DraftCard { card_id: id.clone() });
@@ -159,10 +169,7 @@ fn uniform_mode_has_no_telemetry() {
     let _ = engine.apply(&Command::DraftWheel);
     let _ = engine.apply(&Command::FinishLoadout);
     let _ = engine.apply(&Command::PickNode { node_id: "f0l0".into() });
-    let _ = engine.apply(&Command::PlaceBet {
-        bet: roulette_core::bets::BetType::Red,
-                amount: 5,
-    });
+    let _ = engine.apply(&Command::PlaceBet { bet: roulette_core::bets::BetType::Red, amount: 5 });
     engine.apply(&Command::Spin).expect("spin");
     assert!(engine.spin_telemetry_bytes(0).is_none(), "uniform path records no frames");
 }

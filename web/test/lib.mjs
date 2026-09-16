@@ -89,6 +89,9 @@ export function candidatesFor(state) {
   } else if (gs === 'combat') {
     for (let i = 0; i < (battle.hand?.length ?? 0); i++) out.push({ cmd: 'play_card', hand_index: i });
     if ((battle.bets?.length ?? 0) === 0) {
+      // Harness guard (design-audit #7): `battle` folds to null right after
+      // `battle_ended` while `game_state` can still read combat — the ??-chain
+      // keeps candidate generation TypeError-free in that window.
       const amt = Math.min(5, battle.chips_pool ?? 0);
       if (amt > 0) {
         // Alternate red/black by round parity: with mirrored wheels both

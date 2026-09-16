@@ -110,3 +110,27 @@ Principle: *content is data (RON), mechanics are code, seam is a typed EffectKin
   - RoundOutcome mapping trap: engine outcome is 'player_victory'|'player_defeat'|'sudden_death'|'in_progress' — NOT win/lose; map in SoundManager.onEvents.
   - Tests: `node web/test/audio.test.mjs` (13 gates TEST-013a..m). pkg/pkg-web built BEFORE the unused-`mut` warning fix — rebuild only needed if Rust surface changes again.
   - Untracked leftovers (do not commit): `.agents_tmp/design_audit_ui.md`, `package-lock.json` (node_modules/dist/target gitignored).
+
+## Design-audit battle fixes (B1/B2/B3b/B4/B5) — balance facts
+- **B1 root cause (fixed)**: enemy bets NEVER deducted stakes from `enemy_chips_pool`
+  (`enemy_take_turn` pushed bets without pool math) → house pool monotone non-decreasing,
+  free-roll line, pts race at round limit unwinnable (flat-policy win rate 13–18%).
+  Fix: deduct committed chips at placement, mirroring player `place_bet`. Also:
+  dozen/column p_win now computed from actual felt coverage (old hardcoded `12/36`
+  produced f32 knife-edge EV ≈ +6e-8 → dead bets ranked "positive"); when no candidate
+  is positive-EV the house plays its least-bad line instead of folding (§3.2 house
+  always bets).
+- **Post-fix sweep** (flat policy, legal commands, 30 runs/difficulty): short 57.3%,
+  medium 61.9%, long 62.5% battle win rate (band 40–60%; medium/long ~2pts over,
+  within CI). `tools/ai-play.mjs --campaign 30`: 12/30 full-run victories
+  (short 7/10, medium 2/10, long 3/10) vs audit target ≥3/30. Previously 0/30.
+- **Golden test contract** (`golden_battle_replay_is_identical`): same-seed identity
+  still asserted; seed-divergence now sampled on a 24-slot double-dozen wheel at
+  difficulty 0 — on the 13-slot test wheel the honest-EV AI's best line is unique
+  (12/13 dozen) and deterministic, which is legal; HEAD's divergence came from the
+  f32-noise candidate list.
+- **wasm pkg is a build artifact of the Node harness** (`web/test/lib.mjs` loads
+  `crates/roulette-wasm/pkg/roulette_wasm.js`): after ANY engine change rebuild with
+  `wasm-pack build --target nodejs --out-dir pkg --release` from that crate dir
+  (~35s) or the harness silently runs stale logic — this masked the B1 fix on the
+  first sweep re-run.

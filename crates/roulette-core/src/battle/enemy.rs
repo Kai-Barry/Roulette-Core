@@ -19,10 +19,22 @@ impl BattleState {
             self.begin_betting(Side::Player);
             return None;
         }
+        self.last_executed_intent = None;
         self.begin_betting(Side::Enemy);
-        for (bet_type, amount) in self.enemy_choose_bets(rng) {
-            self.enemy_bets.push(Bet { bet_type, amount });
+        let chosen = self.enemy_choose_bets(rng);
+        // Stakes leave the house pool at placement, mirroring the player's
+        // `place_bet` (§3.4; resolve.rs "losing stakes vanish (already
+        // deducted at placement)"). Without this the house line is a free
+        // roll: pools only ever grow and the pts race at the round limit is
+        // unwinnable (design-audit B1 root cause).
+        let committed: u16 = chosen.iter().map(|(_, a)| *a).sum();
+        self.enemy_chips_pool = self.enemy_chips_pool.saturating_sub(committed);
+        for (bet_type, amount) in &chosen {
+            self.enemy_bets.push(Bet { bet_type: *bet_type, amount: *amount });
         }
+        // Observability (B4): snapshot before resolve clears `enemy_bets`.
+        self.last_enemy_bets =
+            chosen.into_iter().map(|(bet_type, amount)| Bet { bet_type, amount }).collect();
         self.phase = BattlePhase::Spinning;
         let outcome = self.resolve_spin(&SpinInput {
             side: Side::Enemy,
@@ -76,11 +88,21 @@ impl BattleState {
         }
         candidates.push((BetType::Odd, parity(true) / slots, 2.0));
         candidates.push((BetType::Even, parity(false) / slots, 2.0));
+        // Dozen/column coverage is computed from the actual felt (§ readable
+        // odds): on 37/38-slot wheels a dozen is 12/slots (EV < 0 at 3×), and
+        // on short wheels some groups are simply absent.
+        let dozen_count = |lo: u32| -> f32 {
+            wheel.numbers.iter().filter(|&&n| n >= lo && n < lo + 12).count() as f32
+        };
         for d in 1..=3u8 {
-            candidates.push((BetType::Dozen(d), 12.0 / 36.0, 3.0));
+            let lo = u32::from(d) * 12 - 11;
+            candidates.push((BetType::Dozen(d), dozen_count(lo) / slots, 3.0));
         }
+        let column_count = |rem: u8| {
+            wheel.numbers.iter().filter(|&&n| n > 0 && n % 3 == u32::from(rem)).count() as f32
+        };
         for c in 1..=3u8 {
-            candidates.push((BetType::Column(c), 12.0 / 36.0, 3.0));
+            candidates.push((BetType::Column(c), column_count(c % 3) / slots, 3.0));
         }
         // Special colors the enemy wheel carries, at their default payouts.
         for (&n, &color) in wheel.slot_colors.iter() {
@@ -94,15 +116,16 @@ impl BattleState {
             }
         }
 
-        let mut scored: Vec<(BetType, f32)> = candidates
-            .into_iter()
-            .map(|(t, p, pay)| (t, p * (pay - 1.0) - (1.0 - p)))
-            .filter(|&(_, ev)| ev > 0.0)
-            .collect();
+        let mut scored: Vec<(BetType, f32)> =
+            candidates.into_iter().map(|(t, p, pay)| (t, p * (pay - 1.0) - (1.0 - p))).collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        if scored.is_empty() {
-            return Vec::new();
-        }
+        // §3.2: the house always bets on its own felt. When no line is
+        // positive-EV (true on honest wheels), it still plays its least-bad
+        // candidates instead of folding — a silent house would starve the
+        // pts race and never execute intents (design-audit B1 follow-up).
+        let positive: Vec<(BetType, f32)> =
+            scored.iter().copied().filter(|&(_, ev)| ev > 0.0).collect();
+        let scored = if positive.is_empty() { scored } else { positive };
 
         // Risk tolerance (§7.4): scales toward 1.0 as the AI falls behind.
         let risk =
@@ -118,7 +141,12 @@ impl BattleState {
         };
 
         // Committed chips: ~10% of pool at base risk up to ~50% at max risk.
-        let commit = ((self.enemy_chips_pool as f32) * (0.1 + 0.4 * risk)).floor() as u16;
+        // Anti-snowball (design-audit B2): the fraction is taken of a
+        // bounded bank — the §3.1 pool floor — so absolute commitment stops
+        // growing once the house is ahead; compounding cannot outrun the
+        // player's flat line forever.
+        let stake_base = self.enemy_chips_pool.min(self.chips_pool);
+        let commit = ((stake_base as f32) * (0.1 + 0.4 * risk)).floor() as u16;
         if commit == 0 {
             return Vec::new();
         }
@@ -159,6 +187,8 @@ impl BattleState {
         let Some(intent) = self.enemy_intent.take() else {
             return;
         };
+        // Observability (B5): keep the executed intent for the event payload.
+        self.last_executed_intent = Some(intent.clone());
         match intent.action {
             EnemyAction::Attack => {
                 let dmg = intent.value.min(self.player_hp);

@@ -26,10 +26,7 @@ pub fn new_engine(seed: String) -> Result<EngineHandle, JsValue> {
         Content::embedded()
             .map_err(|e| JsValue::from_str(&format!("embedded content invalid: {e}")))?,
     );
-    Ok(EngineHandle {
-        engine: Engine::new(content, &seed),
-        seed,
-    })
+    Ok(EngineHandle { engine: Engine::new(content, &seed), seed })
 }
 
 #[wasm_bindgen]
@@ -40,7 +37,9 @@ impl EngineHandle {
     /// keep the JS side dependency-free: `JSON.parse` is the only glue.
     pub fn apply_command(&mut self, cmd_json: &str) -> Result<String, String> {
         let cmd: Command = serde_json::from_str(cmd_json).map_err(|e| {
-            format!("{{\"error\":true,\"kind\":\"bad_command\",\"message\":\"bad command json: {e}\"}}")
+            format!(
+                "{{\"error\":true,\"kind\":\"bad_command\",\"message\":\"bad command json: {e}\"}}"
+            )
         })?;
         match self.engine.apply(&cmd) {
             Ok(events) => {
@@ -104,9 +103,7 @@ impl EngineHandle {
     /// 1 = enemy. `"[]"` when the side was not simulated (uniform fast path).
     #[cfg(feature = "telemetry")]
     pub fn spin_sim_events(&self, side: u8) -> String {
-        self.engine
-            .spin_sim_events_json(side)
-            .unwrap_or_else(|| "[]".to_string())
+        self.engine.spin_sim_events_json(side).unwrap_or_else(|| "[]".to_string())
     }
 }
 

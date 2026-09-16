@@ -4,6 +4,11 @@ use roulette_content::schema::EnemyIntentDef;
 
 use super::state::{BattleOutcome, BattleState, Side};
 
+/// Extra sudden-death rounds granted before a tie is decided by the house
+/// edge (PlayerDefeat). Caps the mirrored-betting tie loop (design-audit B3b,
+/// REQ-005 termination).
+const SUDDEN_DEATH_MAX_ROUNDS: u32 = 3;
+
 impl BattleState {
     /// Arms the enemy's current intent from its 4-move pattern.
     pub fn load_intent(&mut self, pattern: &[EnemyIntentDef; 4]) {
@@ -28,7 +33,8 @@ impl BattleState {
 
     /// Ends the round (after both sides spun): tick modifier durations, apply
     /// Curse of Blood, advance the round, and evaluate the outcome. Sudden
-    /// death grants one extra round per tie (§3.5).
+    /// death grants up to [`SUDDEN_DEATH_MAX_ROUNDS`] extra rounds per tie
+    /// (§3.5); a final tie is decided by the house edge.
     pub fn end_round(&mut self) -> BattleOutcome {
         // OnRoundEnd hook (§6.4): Capital Venture pays on a round win and the
         // round's played cards are filed (temp cards exiled).
@@ -63,11 +69,19 @@ impl BattleState {
             std::cmp::Ordering::Less => BattleOutcome::PlayerDefeat,
             std::cmp::Ordering::Equal => {
                 if self.is_sudden_death {
-                    // Repeated tie: another sudden-death round.
+                    // Sudden-death tie under a capped budget: after MAX
+                    // extra rounds the house edge decides — a mirrored
+                    // same-type betting loop must not run forever (REQ-005
+                    // termination; design-audit B3b).
+                    self.sudden_death_rounds += 1;
+                    if self.sudden_death_rounds >= SUDDEN_DEATH_MAX_ROUNDS {
+                        return BattleOutcome::PlayerDefeat;
+                    }
                     self.round += 1;
                     BattleOutcome::SuddenDeath
                 } else {
                     self.is_sudden_death = true;
+                    self.sudden_death_rounds = 1;
                     self.round += 1;
                     BattleOutcome::SuddenDeath
                 }

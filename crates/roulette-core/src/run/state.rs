@@ -276,17 +276,10 @@ impl RunState {
                 .map(|row| row.iter().map(|n| n.id.clone()).collect())
                 .unwrap_or_default(),
             Some(current) => {
-                let mut ids = self
-                    .map
-                    .node(current)
-                    .map(|n| n.connections.clone())
-                    .unwrap_or_default();
+                let mut ids =
+                    self.map.node(current).map(|n| n.connections.clone()).unwrap_or_default();
                 if self.state == GameState::Map {
-                    let retry = self
-                        .map
-                        .node(current)
-                        .map(|n| !n.completed)
-                        .unwrap_or(false);
+                    let retry = self.map.node(current).map(|n| !n.completed).unwrap_or(false);
                     if retry && !ids.iter().any(|id| id == current) {
                         ids.push(current.clone());
                     }

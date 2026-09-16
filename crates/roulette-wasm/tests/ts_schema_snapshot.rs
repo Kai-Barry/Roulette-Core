@@ -41,12 +41,16 @@ fn enum_variants(source: &str, enum_name: &str) -> Vec<String> {
         if trimmed.is_empty() || trimmed.starts_with("//") || trimmed.starts_with("#[") {
             continue;
         }
-        let ident: String = trimmed.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+        let ident: String =
+            trimmed.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
         if ident.is_empty() {
             continue;
         }
         let rest = trimmed[ident.len()..].trim_start();
-        if rest.starts_with('{') || rest.starts_with('(') || rest.starts_with(',') || rest.is_empty()
+        if rest.starts_with('{')
+            || rest.starts_with('(')
+            || rest.starts_with(',')
+            || rest.is_empty()
         {
             variants.push(ident);
         }
@@ -76,9 +80,8 @@ fn to_snake_case(name: &str) -> String {
 /// Pulls the string literals out of `export const <NAME> = [ ... ] as const;`.
 fn ts_tag_list(schema_ts: &str, const_name: &str) -> Vec<String> {
     let decl = format!("export const {const_name} = [");
-    let start = schema_ts
-        .find(&decl)
-        .unwrap_or_else(|| panic!("missing {const_name} in schema.ts"));
+    let start =
+        schema_ts.find(&decl).unwrap_or_else(|| panic!("missing {const_name} in schema.ts"));
     let body_start = start + decl.len();
     let end_rel = schema_ts[body_start..]
         .find("] as const;")

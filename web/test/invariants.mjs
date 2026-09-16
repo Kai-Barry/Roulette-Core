@@ -1,6 +1,9 @@
 // Invariant suite (TASK-004). Run after every state change in every
 // ai:check run; each check is cheap (JSON reads) to keep token burn near zero.
 
+// Must match SUDDEN_DEATH_MAX_ROUNDS in battle/round_end.rs.
+const SUDDEN_DEATH_MAX_ROUNDS = 3;
+
 export function checkInvariants(session, label = '') {
   const s = session.state();
   const run = s.run;
@@ -20,7 +23,9 @@ export function checkInvariants(session, label = '') {
       if (total && total > (battle.turn_start_pool ?? Infinity) + 1000) fails.push(`bets exceed pool: ${total}`);
     }
     if (battle.hand && battle.hand.length > 8) fails.push(`hand over limit: ${battle.hand.length}`);
-    if (battle.round > (battle.max_rounds ?? 1e9) + 5) fails.push(`round ${battle.round} >> max ${battle.max_rounds} (sudden death ok)`);
+    if (battle.round > (battle.max_rounds ?? 1e9) + SUDDEN_DEATH_MAX_ROUNDS) {
+      fails.push(`round ${battle.round} >> max ${battle.max_rounds} (sudden death ok)`);
+    }
   }
   if (s.undo_depth > 64) fails.push(`undo depth ${s.undo_depth} > 64`);
 
