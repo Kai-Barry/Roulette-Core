@@ -151,6 +151,22 @@ pub struct Engine {
     card_defs: std::collections::BTreeMap<String, roulette_content::schema::CardDef>,
     events: Vec<EngineEvent>,
     undo: Vec<EngineSnapshot>,
+    /// Last spin's telemetry frames, side-channel only (feature `telemetry`,
+    /// REQ-008). One entry per simulated wheel per spin. Cleared and refilled
+    /// on every spin; never serialized into undo.
+    #[cfg(feature = "telemetry")]
+    spin_frames: Vec<(crate::battle::state::Side, SpinTelemetry)>,
+}
+
+/// Side-channel telemetry for one simulated wheel of the last spin
+/// (feature `telemetry`). Self-describing: carries the slot geometry so the
+/// visual layer (and TEST-010) can map final angles back to slots without
+/// any other engine surface.
+#[cfg(feature = "telemetry")]
+pub struct SpinTelemetry {
+    pub slot_count: u32,
+    pub slot_width: f64,
+    pub frames: Vec<crate::phys::simulator::TelemetryFrame>,
 }
 
 impl Engine {
@@ -171,6 +187,8 @@ impl Engine {
             card_defs,
             events: Vec::new(),
             undo: Vec::new(),
+            #[cfg(feature = "telemetry")]
+            spin_frames: Vec::new(),
         }
     }
 
@@ -199,6 +217,40 @@ impl Engine {
 
     pub fn spin_sampling(&self) -> SpinSampling {
         self.spin_sampling
+    }
+
+    /// Spin telemetry side channel (feature `telemetry`, TASK-008/REQ-008):
+    /// fixed-dt (1/120 s) frames for the LAST spin, packed little-endian as
+    /// `[u32 frame_count][u32 ball_count][u32 slot_count][f32 slot_width]`
+    /// then per frame `[f32 wheel_angle, f32 ball0..ballN]`. `side` selects
+    /// the player (0) or enemy (1) wheel. Returns `None` when the side was
+    /// not simulated this spin (e.g. uniform fast path — the renderer falls
+    /// back to a generic animation there).
+    #[cfg(feature = "telemetry")]
+    pub fn spin_telemetry_bytes(&self, side: u8) -> Option<Vec<u8>> {
+        use crate::battle::state::Side;
+        let want = match side {
+            0 => Side::Player,
+            _ => Side::Enemy,
+        };
+        let tele = &self.spin_frames.iter().find(|(s, _)| *s == want)?.1;
+        if tele.frames.is_empty() {
+            return None;
+        }
+        let ball_count = tele.frames[0].ball_angles.len();
+        let mut out =
+            Vec::with_capacity(12 + tele.frames.len() * 4 * (1 + ball_count));
+        out.extend_from_slice(&(tele.frames.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(ball_count as u32).to_le_bytes());
+        out.extend_from_slice(&tele.slot_count.to_le_bytes());
+        out.extend_from_slice(&(tele.slot_width as f32).to_le_bytes());
+        for f in &tele.frames {
+            out.extend_from_slice(&(f.wheel_angle as f32).to_le_bytes());
+            for &a in &f.ball_angles {
+                out.extend_from_slice(&(a as f32).to_le_bytes());
+            }
+        }
+        Some(out)
     }
 
     // -- command dispatch ----------------------------------------------------
@@ -703,11 +755,31 @@ impl Engine {
             let nudge = (mods.nudge_cheat_active && mods.nudge_distance > 0)
                 .then_some(mods.nudge_distance as i32);
             let battle = self.battle.as_mut().ok_or(EngineError::NotInBattle)?;
+            #[cfg(not(feature = "telemetry"))]
             let (_, result) = if self.spin_sampling == SpinSampling::Uniform {
                 let balls = mods.ball_count();
                 Simulator::uniform_run(&layout, balls, live)
             } else {
                 Simulator::new(layout.clone(), mods, live).run_to_completion(nudge)
+            };
+            #[cfg(feature = "telemetry")]
+            let result = {
+                let (result, frames) = if self.spin_sampling == SpinSampling::Uniform {
+                    let balls = mods.ball_count();
+                    let (_, r) = Simulator::uniform_run(&layout, balls, live);
+                    (r, Vec::new())
+                } else {
+                    let (_, r, frames) =
+                        Simulator::new(layout.clone(), mods, live).run_to_completion_with_telemetry(nudge);
+                    (r, frames)
+                };
+                self.spin_frames.retain(|(s, _)| *s != crate::battle::state::Side::Player);
+                self.spin_frames.push((crate::battle::state::Side::Player, SpinTelemetry {
+                    slot_count: layout.len() as u32,
+                    slot_width: layout.slot_width,
+                    frames,
+                }));
+                result
             };
             for &slot in &result.slots {
                 events.push(EngineEvent::BallLanded {
@@ -736,11 +808,31 @@ impl Engine {
             let layout = self.enemy_layout(battle);
             let mods = PhysicsModifiers::default();
             let live = self.run_rng().derive(&format!("spin:{}:enemy", self.spin_index));
+            #[cfg(not(feature = "telemetry"))]
             let (_, result) = if self.spin_sampling == SpinSampling::Uniform {
                 let balls = mods.ball_count();
                 Simulator::uniform_run(&layout, balls, live)
             } else {
                 Simulator::new(layout.clone(), mods, live).run_to_completion(None)
+            };
+            #[cfg(feature = "telemetry")]
+            let result = {
+                let (result, frames) = if self.spin_sampling == SpinSampling::Uniform {
+                    let balls = mods.ball_count();
+                    let (_, r) = Simulator::uniform_run(&layout, balls, live);
+                    (r, Vec::new())
+                } else {
+                    let (_, r, frames) =
+                        Simulator::new(layout.clone(), mods, live).run_to_completion_with_telemetry(None);
+                    (r, frames)
+                };
+                self.spin_frames.retain(|(s, _)| *s != crate::battle::state::Side::Enemy);
+                self.spin_frames.push((crate::battle::state::Side::Enemy, SpinTelemetry {
+                    slot_count: layout.len() as u32,
+                    slot_width: layout.slot_width,
+                    frames,
+                }));
+                result
             };
             for &slot in &result.slots {
                 events.push(EngineEvent::BallLanded {

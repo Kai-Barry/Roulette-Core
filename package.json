@@ -1,0 +1,10 @@
+{
+  "name": "roulette-os",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Roulette.OS — three.js client over the roulette-core WASM engine",
+  "scripts": {
+    "ai:check": "node tools/ai-check.mjs"
+  }
+}

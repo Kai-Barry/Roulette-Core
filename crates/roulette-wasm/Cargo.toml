@@ -15,5 +15,9 @@ console_error_panic_hook = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+[features]
+# Forward the telemetry side channel to JS (REQ-008).
+telemetry = ["roulette-core/telemetry"]
+
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

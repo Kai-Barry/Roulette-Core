@@ -85,6 +85,16 @@ impl EngineHandle {
     pub fn seed(&self) -> String {
         self.seed.clone()
     }
+
+    /// Spin telemetry side channel (TASK-008, feature `telemetry`): packed
+    /// fixed-dt frames for the LAST spin — see
+    /// `roulette_core::api::Engine::spin_telemetry_bytes` for the layout.
+    /// `side`: 0 = player wheel, 1 = enemy wheel. Empty array when the side
+    /// was not simulated (uniform fast path).
+    #[cfg(feature = "telemetry")]
+    pub fn spin_telemetry(&self, side: u8) -> Vec<u8> {
+        self.engine.spin_telemetry_bytes(side).unwrap_or_default()
+    }
 }
 
 fn state_name(gs: roulette_core::run::state::GameState) -> &'static str {

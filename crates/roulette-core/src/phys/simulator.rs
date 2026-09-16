@@ -77,6 +77,20 @@ pub struct Simulator {
 
     events: Vec<SimEvent>,
     steps_taken: usize,
+
+    /// Per-step wheel/ball angles, recorded only under the `telemetry` feature
+    /// (TASK-008 side channel; fixed dt by construction = PHYSICS_STEP).
+    #[cfg(feature = "telemetry")]
+    frames: Vec<TelemetryFrame>,
+}
+
+/// One telemetry frame: absolute wheel angle + per-ball absolute angles at a
+/// fixed 1/120 s step (feature `telemetry` only).
+#[cfg(feature = "telemetry")]
+#[derive(Clone, Debug)]
+pub struct TelemetryFrame {
+    pub wheel_angle: f64,
+    pub ball_angles: Vec<f64>,
 }
 
 impl Simulator {
@@ -97,6 +111,8 @@ impl Simulator {
             nudged: false,
             events: Vec::new(),
             steps_taken: 0,
+            #[cfg(feature = "telemetry")]
+            frames: Vec::new(),
         };
         sim.wheel_omega = sim.launch_wheel_omega();
         let count = sim.mods.ball_count();
@@ -322,6 +338,15 @@ impl Simulator {
         }
     }
 
+    /// Telemetry snapshot (feature `telemetry`, TASK-008): the current wheel
+    /// angle plus every ball's absolute angle, in ball spawn order. Additive
+    /// read-only accessor — private fields stay private; the normative event
+    /// log is untouched (REQ-008).
+    #[cfg(feature = "telemetry")]
+    pub fn snapshot(&self) -> (f64, Vec<f64>) {
+        (self.wheel_angle, self.balls.iter().map(|b| b.angle).collect())
+    }
+
     /// Collect the result. Unsettled balls (step cap) map to their current
     /// wheel-relative slot so results are always valid indices (TEST-002).
     pub fn result(&self) -> SpinResult {
@@ -352,12 +377,38 @@ impl Simulator {
         while !self.is_complete() {
             let ev = self.step();
             all_events.extend(ev);
+            #[cfg(feature = "telemetry")]
+            self.frames.push(TelemetryFrame { wheel_angle: self.wheel_angle, ball_angles: self.balls.iter().map(|b| b.angle).collect() });
         }
         if let Some(dir) = nudge_toward {
             self.apply_nudge(dir);
         }
         let result = self.result();
         (all_events, result)
+    }
+
+    /// Like [`Simulator::run_to_completion`] but also returns the recorded
+    /// telemetry frames (feature `telemetry`, TASK-008). Frames are recorded
+    /// pre-nudge (the nudge is a result-space slot shift, not an angle change),
+    /// so for cheat-free spins the final frame + [`Simulator::slot_at_angle`]
+    /// agrees with [`SpinResult::slots`] (TEST-010).
+    #[cfg(feature = "telemetry")]
+    pub fn run_to_completion_with_telemetry(
+        mut self,
+        nudge_toward: Option<i32>,
+    ) -> (Vec<SimEvent>, SpinResult, Vec<TelemetryFrame>) {
+        let mut all_events = Vec::new();
+        while !self.is_complete() {
+            let ev = self.step();
+            all_events.extend(ev);
+            self.frames.push(TelemetryFrame { wheel_angle: self.wheel_angle, ball_angles: self.balls.iter().map(|b| b.angle).collect() });
+        }
+        if let Some(dir) = nudge_toward {
+            self.apply_nudge(dir);
+        }
+        let result = self.result();
+        let frames = std::mem::take(&mut self.frames);
+        (all_events, result, frames)
     }
 
     /// Uniform fast path (§15/TASK-045): samples each ball's slot uniformly

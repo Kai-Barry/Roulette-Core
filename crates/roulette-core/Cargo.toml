@@ -15,5 +15,10 @@ thiserror.workspace = true
 [dev-dependencies]
 proptest = "1"
 
+[features]
+# Additive, non-normative per-frame wheel/ball telemetry for the 3D visual
+# layer (REQ-008: side channel only — the event log stays float-free).
+telemetry = []
+
 [lints]
 workspace = true
