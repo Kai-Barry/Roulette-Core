@@ -389,13 +389,13 @@ impl Engine {
                 self.events.push(EngineEvent::Purchased { item: *item_index, price });
                 match bought {
                     crate::run::ShopItemBought::Card(id) => {
-                        self.events.push(EngineEvent::CardGained(id))
+                        self.events.push(EngineEvent::CardGained { id })
                     }
                     crate::run::ShopItemBought::Wheel(id) => {
-                        self.events.push(EngineEvent::WheelGained(id))
+                        self.events.push(EngineEvent::WheelGained { id })
                     }
                     crate::run::ShopItemBought::Heal(hp) => {
-                        self.events.push(EngineEvent::Healed(hp))
+                        self.events.push(EngineEvent::Healed { hp })
                     }
                 }
                 Ok(())
@@ -758,7 +758,13 @@ impl Engine {
             events.push(EngineEvent::IntentExecuted);
         }
         let battle = self.battle.as_mut().ok_or(EngineError::NotInBattle)?;
-        battle.advance_after_spin();
+        // When the enemy was stunned, `enemy_take_turn` already handed the
+        // turn to the player; advancing again would hand it back to the
+        // enemy with nobody to act — a command-level softlock ("not your
+        // turn" forever). Only the taken turn needs an advance.
+        if intent.is_some() {
+            battle.advance_after_spin();
+        }
         self.spin_index += 1;
 
         // 3. Round end --------------------------------------------------------

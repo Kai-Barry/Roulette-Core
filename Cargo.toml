@@ -5,6 +5,7 @@ members = [
     "crates/roulette-core",
     "crates/roulette-cli",
     "crates/roulette-sim",
+    "crates/roulette-wasm",
 ]
 
 [workspace.package]

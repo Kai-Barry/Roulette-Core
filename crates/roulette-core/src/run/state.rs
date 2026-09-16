@@ -263,7 +263,10 @@ impl RunState {
     // ------------------------------------------------------------------
 
     /// Nodes the player may move to: on floor 0 any node, else the current
-    /// node's connections (§2.3 path rule).
+    /// node's connections (§2.3 path rule). From the Map screen an
+    /// un-completed current node is re-pickable so a score-loss walk-away
+    /// can retry the node; inside a node screen it is not (offers would be
+    /// regenerated forever).
     pub fn pickable_nodes(&self) -> Vec<String> {
         match &self.current_node {
             None => self
@@ -273,7 +276,22 @@ impl RunState {
                 .map(|row| row.iter().map(|n| n.id.clone()).collect())
                 .unwrap_or_default(),
             Some(current) => {
-                self.map.node(current).map(|n| n.connections.clone()).unwrap_or_default()
+                let mut ids = self
+                    .map
+                    .node(current)
+                    .map(|n| n.connections.clone())
+                    .unwrap_or_default();
+                if self.state == GameState::Map {
+                    let retry = self
+                        .map
+                        .node(current)
+                        .map(|n| !n.completed)
+                        .unwrap_or(false);
+                    if retry && !ids.iter().any(|id| id == current) {
+                        ids.push(current.clone());
+                    }
+                }
+                ids
             }
         }
     }

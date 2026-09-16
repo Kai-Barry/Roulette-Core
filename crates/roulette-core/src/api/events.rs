@@ -82,9 +82,9 @@ pub enum EngineEvent {
         item: usize,
         price: u16,
     },
-    CardGained(String),
-    WheelGained(String),
-    Healed(u16),
+    CardGained { id: String },
+    WheelGained { id: String },
+    Healed { hp: u16 },
     ForgeApplied {
         op: usize,
     },

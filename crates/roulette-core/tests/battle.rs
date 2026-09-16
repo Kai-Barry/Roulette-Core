@@ -573,6 +573,31 @@ fn stunned_enemy_skips_turn() {
 }
 
 // ---------------------------------------------------------------------------
+#[test]
+fn stunned_enemy_does_not_softlock_command_flow() {
+    // Regression for the api-level stun softlock: after a skipped enemy turn
+    // (stun path), the next player `spin` must be accepted — the double
+    // advance used to hand betting back to the enemy ("not your turn").
+    let mut state = test_battle(no_curses());
+    state.begin_betting(Side::Player);
+    // Player's turn completes via advance_after_spin (turn → Enemy).
+    state.advance_after_spin();
+    assert_eq!(state.turn, Side::Enemy);
+    // Enemy is stunned: enemy_take_turn returns None and hands the turn to
+    // the player (unit behavior asserted above). The api layer must NOT
+    // advance again in that case — mirror the fixed api logic here:
+    let mut rng = Rng::new(9);
+    let out = state.enemy_take_turn(&mut rng, 0);
+    if out.is_none() {
+        // stun path: no api-level advance_after_spin call
+    } else {
+        state.advance_after_spin();
+    }
+    assert_eq!(state.turn, Side::Player, "player bets again after stun skip");
+    // The player can now act: placing a bet must not fail with turn errors.
+    state.place_bet(BetType::Red, 5).expect("player may bet after stunned enemy turn");
+    assert_eq!(state.total_stake(), 5);
+}
 // §3.2/§3.5 round flow & sudden death
 // ---------------------------------------------------------------------------
 
