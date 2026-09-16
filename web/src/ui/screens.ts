@@ -20,21 +20,27 @@ export interface ScreenCtx {
 // -- MENU + LOADOUT (TASK-016) ------------------------------------------------
 
 export function menuScreen(ctx: ScreenCtx): VNode {
+  const subtitle: Record<string, string> = {
+    short: 'quick pact — fewer floors',
+    standard: 'the default descent',
+    long: 'full descent — for the damned',
+  };
   return h('section', { 'data-screen': 'menu', 'data-test': 'screen-menu' },
     h('h1', {}, 'ROULETTE OF THE DAMNED'),
+    h('p', { 'data-test': 'menu-tagline' }, 'ROULETTE.OS — spin against the house, or be spun.'),
     h('div', { 'data-test': 'difficulty-select' },
       ['short', 'standard', 'long'].map((d) =>
         h('button', {
           'data-test': `difficulty-${d}`,
           'data-cmd': JSON.stringify({ cmd: 'start_run', difficulty: d }),
           onclick: () => ctx.dispatch({ cmd: 'start_run', difficulty: d as never }),
-        }, d))),
+        }, `${d} — ${subtitle[d]}`))),
   );
 }
 
 export function loadoutScreen(ctx: ScreenCtx): VNode {
   const v = P.loadoutView(ctx.state);
-  const spent = 0; // engine mutates store_points as drafts are bought
+  const deck = ctx.state.run?.deck ?? [];
   return h('section', { 'data-screen': 'loadout', 'data-test': 'screen-loadout' },
     h('h2', {}, 'LOADOUT STORE'),
     h('div', { 'data-test': 'budget', 'data-store-points': v.storePoints },
@@ -54,13 +60,14 @@ export function loadoutScreen(ctx: ScreenCtx): VNode {
           'data-cmd': JSON.stringify({ cmd: 'draft_wheel' }),
           onclick: () => ctx.dispatch({ cmd: 'draft_wheel' }),
         }, 'draft wheel'))),
+    h('div', { 'data-test': 'deck-list', 'data-deck-size': deck.length },
+      deck.length === 0 ? 'deck: empty' : `deck: ${deck.join(', ')}`),
     h('button', {
       'data-test': 'finish-loadout',
       'data-cmd': JSON.stringify({ cmd: 'finish_loadout' }),
       onclick: () => ctx.dispatch({ cmd: 'finish_loadout' }),
     }, 'finish loadout'),
   );
-  void spent;
 }
 
 // -- MAP (TASK-017) -----------------------------------------------------------
@@ -71,12 +78,17 @@ const NODE_ICON: Record<string, string> = {
 
 export function mapScreen(ctx: ScreenCtx): VNode {
   const v = P.mapView(ctx.state);
+  // Node placement derives from engine floor/lane data (REQ-002): y follows
+  // floor (bottom = floor 0), x follows lane. Pure presentation math, as
+  // percentages for CSS absolute positioning.
+  const X = (lane: number) => ((lane + 1) / 4) * 100;
+  const Y = (floor: number, floors: number) => 92 - (floor / Math.max(floors - 1, 1)) * 84;
   return h('section', { 'data-screen': 'map', 'data-test': 'screen-map' },
     h('div', { 'data-test': 'floor-progress', 'data-floor': v.floor, 'data-floors': v.floors },
       `floor ${v.floor + 1}/${v.floors}`),
-    h('svg', { 'data-test': 'map-svg', viewBox: '0 0 100 100' },
+    h('div', { 'data-test': 'map-svg', class: 'rt-map' },
       v.nodes.map((n) =>
-        h('g', {
+        h('button', {
           'data-test': `node-${n.id}`,
           'data-node-type': n.type,
           'data-node-icon': NODE_ICON[n.type] ?? '?',
@@ -84,8 +96,10 @@ export function mapScreen(ctx: ScreenCtx): VNode {
           'data-pickable': n.pickable,
           'data-floor': n.floor,
           'data-lane': n.lane,
+          class: 'rt-map-node',
+          style: `left: ${X(n.lane)}%; top: ${Y(n.floor, v.floors)}%;`,
           onclick: n.pickable ? () => ctx.dispatch({ cmd: 'pick_node', node_id: n.id }) : undefined,
-        }, `${NODE_ICON[n.type] ?? '?'} ${n.id} ${n.completed ? '✓' : ''}`))),
+        }, `${NODE_ICON[n.type] ?? '?'} ${n.id}${n.completed ? ' ✓' : ''}`))),
   );
 }
 
@@ -223,17 +237,17 @@ function rerollCost(rerollsUsed: number): number {
 }
 
 function customizer(ctx: ScreenCtx): VNode {
-  const wheel = ctx.state.run?.player_wheel;
+  const wheel = ctx.state.run?.player_wheel as { numbers?: number[] } | undefined;
   const slots = wheel?.numbers ?? [];
   return h('div', { 'data-test': 'customizer' },
     slots.map((n, i) =>
       h('button', {
         'data-test': `customize-cycle-${i}`,
-        'data-cmd': JSON.stringify({ cmd: 'customize', op: { cycle_slot: i } }),
-        onclick: () => ctx.dispatch({ cmd: 'customize', op: { cycle_slot: i } }),
+        'data-cmd': JSON.stringify({ cmd: 'customize', op: { op: 'cycle_color', slot: i } }),
+        onclick: () => ctx.dispatch({ cmd: 'customize', op: { op: 'cycle_color', slot: i } }),
       }, `slot ${i}: ${n} cycle`)),
-    h('button', { 'data-test': 'customize-save', 'data-cmd': JSON.stringify({ cmd: 'customize', op: 'save' }), onclick: () => ctx.dispatch({ cmd: 'customize', op: 'save' }) }, 'save wheel'),
-    h('button', { 'data-test': 'customize-cancel', 'data-cmd': JSON.stringify({ cmd: 'customize', op: 'cancel' }), onclick: () => ctx.dispatch({ cmd: 'customize', op: 'cancel' }) }, 'discard'),
+    h('button', { 'data-test': 'customize-save', 'data-cmd': JSON.stringify({ cmd: 'customize', op: { op: 'save' } }), onclick: () => ctx.dispatch({ cmd: 'customize', op: { op: 'save' } }) }, 'save wheel'),
+    h('button', { 'data-test': 'customize-cancel', 'data-cmd': JSON.stringify({ cmd: 'customize', op: { op: 'cancel' } }), onclick: () => ctx.dispatch({ cmd: 'customize', op: { op: 'cancel' } }) }, 'discard'),
   );
 }
 

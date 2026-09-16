@@ -114,6 +114,10 @@ export class ScreenManager {
         this._screen = after;
         this.screenChanges++;
       }
+      // Rebuild the tree synchronously so DOM mounts that run in later
+      // subscribers (entry renderUi) see the post-command screen — the
+      // events/stateChanged emits fire BEFORE dispatch's own render().
+      this.render();
     }
   }
 }

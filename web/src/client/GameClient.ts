@@ -47,7 +47,8 @@ export class EngineError extends Error {
 }
 
 export class GameClient {
-  readonly seed: string;
+  /** Immutable for a client instance; `fromHandle` uses the handle's seed. */
+  seed: string;
   private handle: EngineHandleLike;
   private subscribers = new Set<Subscriber>();
   /** Full EngineEvent log since boot (REQ-003). */

@@ -1,4 +1,6 @@
 /target
 /Version1/node_modules
 /Version1/dist
+/node_modules
+/dist
 *.pdb

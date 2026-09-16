@@ -32,7 +32,7 @@ export function uiCandidates(state: GameStateJson): Command[] {
   if (gs === 'menu') {
     out.push({ cmd: 'start_run', difficulty: 'short' });
   } else if (gs === 'loadout_store') {
-    const offer = run?.loadout_offer;
+    const offer = run?.loadout_offer as { card_ids: string[] } | undefined;
     if (offer) {
       for (const id of offer.card_ids) out.push({ cmd: 'draft_card', card_id: id });
       out.push({ cmd: 'draft_wheel' });
@@ -57,14 +57,14 @@ export function uiCandidates(state: GameStateJson): Command[] {
     out.push({ cmd: 'rebet' });
     out.push({ cmd: 'sacrifice' });
   } else if (gs === 'shop') {
-    const items = run?.shop_offer?.items ?? [];
+    const items = (run?.shop_offer as { items: unknown[] } | undefined)?.items ?? [];
     for (let i = 0; i < items.length; i++) out.push({ cmd: 'purchase', item_index: i });
     for (const id of pickableIds(state)) out.push({ cmd: 'pick_node', node_id: id });
   } else if (gs === 'event') {
     for (const c of eventChoiceIds(state)) out.push({ cmd: 'event_choose', choice_id: c });
     for (const id of pickableIds(state)) out.push({ cmd: 'pick_node', node_id: id });
   } else if (gs === 'forge') {
-    const ops = run?.forge_offer?.ops ?? [];
+    const ops = (run?.forge_offer as { ops: unknown[] } | undefined)?.ops ?? [];
     for (let i = 0; i < ops.length; i++) out.push({ cmd: 'forge_take', op_index: i });
     out.push({ cmd: 'forge_reroll' });
     for (const id of pickableIds(state)) out.push({ cmd: 'pick_node', node_id: id });

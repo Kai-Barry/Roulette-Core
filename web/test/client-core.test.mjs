@@ -116,15 +116,34 @@ ok('hud projects run vitals', () => {
   assert.equal(h.difficulty, 'short');
 });
 
-ok('mapView marks pickable uncompleted nodes on current floor', () => {
+ok('mapView: fresh run floor 0 all pickable, after clear only connections', () => {
   const c = new GameClient(wasm, 'task012map');
   c.startRun('short');
-  const st = c.state();
-  const mv = proj.mapView(st);
+  const offer = c.state().run?.loadout_offer;
+  for (const id of offer?.card_ids ?? []) c.draftCard(id);
+  c.draftWheel();
+  c.finishLoadout();
+  const mv = proj.mapView(c.state());
   assert.ok(mv.floors > 0);
-  const pickable = mv.nodes.filter((n) => n.pickable);
+  let pickable = mv.nodes.filter((n) => n.pickable);
   assert.ok(pickable.length > 0, 'some nodes pickable at floor 0');
   assert.ok(pickable.every((n) => !n.completed));
+  assert.equal(pickable.length, 3, 'entire first floor open before first pick');
+  // Walk to the first combat and win it (seed 'demo' path: bet black/1).
+  const first = pickable.find((n) => n.type === 'combat');
+  c.pickNode(first.id);
+  c.placeBet('black', 1);
+  c.spin();
+  c.placeBet('black', 1);
+  c.spin();
+  c.placeBet('black', 1);
+  c.spin();
+  const st2 = c.state();
+  assert.equal(st2.game_state, 'map', 'battle resolved back to map');
+  const cur = st2.run.map.floors.flat().find((n) => n.id === st2.run.current_node);
+  pickable = proj.mapView(st2).nodes.filter((n) => n.pickable);
+  assert.ok(pickable.length > 0, 'post-battle: connections pickable');
+  for (const n of pickable) assert.ok(cur.connections.includes(n.id), `${n.id} must be a connection of ${cur.id}`);
 });
 
 ok('combatView exposes phase/hand/bets/wheels', () => {

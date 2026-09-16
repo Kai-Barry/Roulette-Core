@@ -7,7 +7,7 @@
  * `?headless=1` (REQ-004); in Node the returned object is the harness API.
  */
 
-import type { Command, EngineEvent, GameStateJson } from '../engine/schema.ts';
+import type { Command, EngineEvent, GameStateJson } from './engine/schema.ts';
 import { GameClient } from './client/GameClient.ts';
 import { Persistence, localStorageLike, stateHash, type StorageLike } from './client/persistence.ts';
 import { ScreenManager, type ScreenName, type UiFeedback } from './ui/ScreenManager.ts';
@@ -46,11 +46,21 @@ export interface BootOptions {
   storage?: StorageLike;
   /** Inject an existing handle (resume path builds one internally). */
   handle?: unknown;
+  /** REQ-006: replay the autosave (command log + hash check) when present.
+   * Pass `false` for an explicit reproducibility request (`?seed=`). */
+  resume?: boolean;
 }
 
 export function boot(opts: BootOptions): RtApi {
-  const client = new GameClient(opts.wasm as never, opts.seed);
   const persistence = new Persistence(opts.wasm as never, opts.storage ?? localStorageLike());
+  let client: GameClient;
+  if (opts.resume !== false) {
+    const resumed = persistence.resume();
+    if (resumed) client = resumed.client;
+    else client = new GameClient(opts.wasm as never, opts.seed);
+  } else {
+    client = new GameClient(opts.wasm as never, opts.seed);
+  }
   // TASK-013 autosave: on every event batch, persist snapshot + command log.
   client.on((ev) => {
     if (ev.kind === 'events') persistence.save(client);

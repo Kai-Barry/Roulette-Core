@@ -81,33 +81,35 @@ export function hud(state: GameStateJson): HudView {
   if (!run) return { hp: 0, maxHp: 0, chips: 0, storePoints: 0, difficulty: '-', floor: 0, undoDepth: state.undo_depth };
   return {
     hp: run.hp, maxHp: run.max_hp, chips: run.chips, storePoints: run.store_points,
-    difficulty: run.difficulty, floor: run.current_floor, undoDepth: state.undo_depth,
+    difficulty: run.difficulty, floor: run.current_floor ?? 0, undoDepth: state.undo_depth,
   };
 }
 
 /** §2.3 map flow: nodes on the current floor are pickable from the start;
  * on deeper floors only nodes connected from completed ancestors. */
 export function pickableNodeIds(run: RunStateJson): Set<string> {
+  // Standing nowhere: the whole first floor is open (§2.3).
   if (run.current_node === null) {
-    return new Set((run.map.floors[0] ?? []).map((n) => n.id));
+    return new Set((run.map.floors[0] ?? []).map((n: MapNode) => n.id));
   }
-  const nodes = run.current_floor === 0 ? (run.map.floors[0] ?? []) : (run.map.floors[run.current_floor] ?? []);
-  return new Set(nodes.map((n) => n.id));
+  // Standing on a (just-cleared) node: only its unvisited connections are on
+  // the path — the engine rejects anything else ("not on your path").
+  const current = (run.map.floors.flat() as MapNode[]).find((n: MapNode) => n.id === run.current_node);
+  return new Set(current?.connections ?? []);
 }
 
 export function mapView(state: GameStateJson): MapView {
   const run = state.run!;
   const floors = run.map.floors;
   const all: MapNode[] = floors.flat();
-  const curFloorNodes = floors[run.current_floor] ?? [];
   const pickable = pickableNodeIds(run);
   return {
-    floor: run.current_floor,
+    floor: run.current_floor ?? 0,
     floors: floors.length,
     nodes: all.map((n) => ({
       id: n.id, floor: n.floor, lane: n.lane, type: n.node_type,
       connections: n.connections, completed: n.completed,
-      pickable: curFloorNodes.some((c) => c.id === n.id) && pickable.has(n.id) && !n.completed,
+      pickable: pickable.has(n.id) && !n.completed,
     })),
   };
 }
@@ -169,8 +171,8 @@ export function forgeView(state: GameStateJson): ForgeView {
 export function eventView(state: GameStateJson): EventView {
   const run = state.run!;
   return {
-    title: run.current_event_title ?? '(event)',
-    flavor: run.event_flavor ?? null,
+    title: (run.current_event_title as string | undefined) ?? '(event)',
+    flavor: (run.event_flavor as string | null | undefined) ?? null,
   };
 }
 

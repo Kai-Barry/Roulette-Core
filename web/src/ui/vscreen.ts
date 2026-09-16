@@ -7,7 +7,7 @@
  * No CSS-animation timing is ever consulted (headless determinism).
  */
 
-export type VAttrs = Record<string, string | number | boolean | undefined>;
+export type VAttrs = Record<string, string | number | boolean | ((...a: unknown[]) => void) | undefined>;
 export interface VNode {
   tag: string;
   attrs: VAttrs;
@@ -79,6 +79,11 @@ function toDom(v: VNode): HTMLElement | Text {
   const el = document.createElement(v.tag);
   for (const [k, val] of Object.entries(v.attrs)) {
     if (val === undefined || val === false) continue;
+    if (typeof val === 'function') {
+      // Event-handler props (onclick…) must become real listeners, not attrs.
+      el.addEventListener(k.startsWith('on') ? k.slice(2) : k, val as EventListener);
+      continue;
+    }
     el.setAttribute(k, val === true ? '' : String(val));
   }
   for (const c of v.children) {
