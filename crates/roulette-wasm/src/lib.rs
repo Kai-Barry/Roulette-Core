@@ -59,7 +59,8 @@ impl EngineHandle {
     pub fn get_state_json(&self) -> String {
         let state = serde_json::json!({
             "seed": self.seed.clone(),
-            "game_state": self.engine.run().map(|r| r.state).map(state_name),
+            // No run yet ⇒ menu (the only reachable no-run state).
+            "game_state": self.engine.run().map(|r| r.state).map(state_name).unwrap_or("menu"),
             "run": self.engine.run(),
             "battle": self.engine.battle(),
             "undo_depth": self.engine.undo_depth(),
