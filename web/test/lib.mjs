@@ -93,17 +93,17 @@ export function candidatesFor(state) {
       if (amt > 0) {
         // Alternate red/black by round parity: with mirrored wheels both
         // sides betting the same type can tie forever in sudden death.
-        const type = (battle.round ?? 0) % 2 === 0 ? { red: null } : { black: null };
+        const type = (battle.round ?? 0) % 2 === 0 ? 'red' : 'black';
         out.push({ cmd: 'place_bet', bet: type, amount: amt });
-        out.push({ cmd: 'place_bet', bet: { green: null }, amount: amt });
-        out.push({ cmd: 'place_bet', bet: { odd: null }, amount: amt });
-        out.push({ cmd: 'place_bet', bet: { even: null }, amount: amt });
+        out.push({ cmd: 'place_bet', bet: 'green', amount: amt });
+        out.push({ cmd: 'place_bet', bet: 'odd', amount: amt });
+        out.push({ cmd: 'place_bet', bet: 'even', amount: amt });
       }
     }
     out.push({ cmd: 'spin' });
     if (battle.bets?.length) {
       const b0 = battle.bets[0];
-      out.push({ cmd: 'remove_bet', bet: b0.bet, amount: b0.amount });
+      out.push({ cmd: 'remove_bet', bet: b0.bet_type, amount: b0.amount });
       out.push({ cmd: 'clear_bets' });
     }
   } else if (gs === 'shop') {

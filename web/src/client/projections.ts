@@ -9,6 +9,7 @@
 import type {
   BattleStateJson,
   Bet,
+  BetType,
   GameStateJson,
   MapNode,
   RunStateJson,
@@ -37,7 +38,7 @@ export interface CombatView {
   phase: string; round: number; maxRounds: number; suddenDeath: boolean;
   playerHp: number; enemyHp: number;
   hand: string[]; handCount: number; drawPile: number; discardPile: number;
-  bets: Bet[]; enemyBets: Bet[]; chipsPool: number; enemyChipsPool: number;
+  bets: Array<{ bet: BetType; amount: number }>; enemyBets: Bet[]; chipsPool: number; enemyChipsPool: number;
   enemyIntent: string | null;
   canBet: boolean; canSpin: boolean; canPlay: boolean;
   playerWheel: WheelConfig; enemyWheel: WheelConfig;
@@ -113,11 +114,14 @@ export function mapView(state: GameStateJson): MapView {
 
 export function combatView(state: GameStateJson, colorLevels: Record<string, number> = {}): CombatView {
   const b: BattleStateJson = state.battle!;
+  const handIds = (b.hand as unknown as Array<{ def_id: string } | string>).map((c) =>
+    typeof c === 'string' ? c : c.def_id);
   return {
     phase: b.phase, round: b.round, maxRounds: b.max_rounds, suddenDeath: b.is_sudden_death,
     playerHp: b.player_hp, enemyHp: b.enemy_hp,
-    hand: b.hand, handCount: b.hand.length, drawPile: b.draw_pile, discardPile: b.discard_pile,
-    bets: b.bets, enemyBets: b.enemy_bets, chipsPool: b.chips_pool, enemyChipsPool: b.enemy_chips_pool,
+    hand: handIds, handCount: handIds.length, drawPile: b.draw_pile, discardPile: b.discard_pile,
+    bets: (b.bets as Array<{ bet_type: BetType; amount: number }>).map((x) => ({ bet: x.bet_type, amount: x.amount })),
+    enemyBets: b.enemy_bets, chipsPool: b.chips_pool, enemyChipsPool: b.enemy_chips_pool,
     enemyIntent: b.enemy_intent,
     canBet: b.phase === 'betting', canSpin: b.phase === 'betting', canPlay: b.phase === 'betting',
     playerWheel: b.player_wheel, enemyWheel: b.enemy_wheel,

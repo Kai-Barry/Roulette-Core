@@ -49,7 +49,7 @@ for (let i = 0; i < 12; i++) {
   const b = s.state().battle;
   if (!b) break;
   if (b.phase === 'betting' && (b.bets?.length ?? 0) === 0) {
-    if (!s.tryCmd({ cmd: 'place_bet', bet: { red: null }, amount: Math.min(5, b.chips_pool ?? 0) })) break;
+    if (!s.tryCmd({ cmd: 'place_bet', bet: 'red', amount: Math.min(5, b.chips_pool ?? 0) })) break;
     continue;
   }
   if (!s.tryCmd({ cmd: 'spin' })) break;
