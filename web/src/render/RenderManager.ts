@@ -218,7 +218,11 @@ export class RenderManager {
     return this.playCursor;
   }
 
-  /** Advance telemetry playback; dt seconds → fixed-dt frame steps. */
+  /** Advance telemetry playback; dt seconds → fixed-dt frame steps.
+   * onPlaybackFrame (TASK-029) fires once per advanced frame index so
+   * SoundManager can sync the §5.4 click/bounce track to the cursor. */
+  onPlaybackFrame: ((frame: number) => void) | null = null;
+  private lastPlaybackFrame = -1;
   tick(dt: number): void {
     if (!this.playbackActive) return;
     const steps = Math.max(1, Math.round(dt * 120));
@@ -233,6 +237,10 @@ export class RenderManager {
     if (f.ballAngles.length > 0) {
       const a = f.ballAngles[0];
       this.ballMesh.position.set(Math.cos(a) * 3.6, 2.6, Math.sin(a) * 3.6);
+    }
+    if (this.playCursor !== this.lastPlaybackFrame) {
+      this.lastPlaybackFrame = this.playCursor;
+      this.onPlaybackFrame?.(this.playCursor);
     }
   }
 

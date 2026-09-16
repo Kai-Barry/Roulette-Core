@@ -28,6 +28,20 @@ export type EngineHandleLike = {
   undo_depth(): number;
   seed(): string;
   spin_telemetry(side: number): Uint8Array;
+  spin_sim_events(side: number): string;
+};
+
+/** One physics sim event with its telemetry frame index (TASK-029 sound
+ * hooks §5.4). Shape mirrors `SimEvent` from `phys/events.rs` (serde JSON). */
+export type TimedSimEvent = {
+  frame: number;
+  event:
+    | { PegHit: { ball: number } }
+    | { DividerTick: { ball: number } }
+    | { BallSettled: { ball: number; slot: number } }
+    | { SettleTimeout: { ball: number } }
+    | { ShotgunFired: { count: number } }
+    | { BallSplit: { ball: number } };
 };
 
 export type ClientEvent =
@@ -118,6 +132,22 @@ export class GameClient {
   /** Binary spin telemetry frames for `side` (0 player, 1 enemy), TASK-008. */
   spinTelemetry(side: 0 | 1): Uint8Array {
     return this.handle.spin_telemetry(side);
+  }
+
+  /** Physics sim events with telemetry frame indices for `side` (0 player,
+   * 1 enemy), TASK-029 §5.4 sound hooks. Side channel — never in the event
+   * log. Returns `[]` when the side was not simulated (uniform fast path). */
+  spinSimEvents(side: 0 | 1): TimedSimEvent[] {
+    const json = this.handle.spin_sim_events(side);
+    if (!json || json === '[]') return [];
+    const parsed: unknown = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e): e is TimedSimEvent =>
+        typeof e === 'object' && e !== null &&
+        typeof (e as TimedSimEvent).frame === 'number' &&
+        typeof (e as TimedSimEvent).event === 'object' && (e as TimedSimEvent).event !== null,
+    );
   }
 
   // -- Command-mirroring methods -------------------------------------------

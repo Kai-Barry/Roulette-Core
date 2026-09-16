@@ -15,6 +15,8 @@ import { boot, installRtWindow, type RtApi } from './main.ts';
 import { RenderManager } from './render/RenderManager.ts';
 import { mount } from './ui/vscreen.ts';
 import type { WheelConfig } from './engine/schema.ts';
+import { SoundManager } from './audio/SoundManager.ts';
+import { EncounterMusic } from './audio/music.ts';
 import { Vector3 } from 'three';
 
 async function main(): Promise<void> {
@@ -155,19 +157,60 @@ async function main(): Promise<void> {
   // Expose the render manager for browser-side gates (REQ-004 harness
   // surface): graph()/fxState() are queryable without screenshots.
   (rt as unknown as Record<string, unknown>).render = rm;
+
+  // TASK-028: audio — three buses driven by the persisted settings store.
+  // Headless-safe by construction (no AudioContext → recorded diagnostics).
+  const sound = new SoundManager(rt.settings);
+  const music = new EncounterMusic(sound);
+  (rt as unknown as Record<string, unknown>).sound = sound;
+  (rt as unknown as Record<string, unknown>).music = music;
+  // First gesture unlocks autoplay-suspended contexts (§12.9).
+  window.addEventListener('pointerdown', () => sound.unlock(), { once: true });
+  // TASK-029: the renderer fires the click/bounce track as the playback
+  // cursor crosses each sim event's frame (§5.4 sync).
+  rm.onPlaybackFrame = (frame) => sound.tickPlayback(frame);
+
+  // TASK-030: last engine-declared encounter tier (from battle_started).
+  let lastBattleTier: string = 'normal';
+
   rt.client.on((ev) => {
     if (ev.kind === 'events') {
       let landed = false;
+      let playerLanded = false;
+      // TASK-030: encounter tier derives from the engine's own battle_started
+      // event (REQ-002 analogue — no invented audio state).
+      for (const e of ev.events) {
+        if (e.event === 'battle_started') lastBattleTier = e.tier;
+      }
       for (const e of ev.events) {
         if (e.event === 'ball_landed' && e.side === 'player' && typeof e.number === 'number') {
           rm.onBallLanded(e.number);
           landed = true;
+          playerLanded = true;
+        } else if (e.event === 'ball_landed' && e.side === 'enemy') {
+          landed = true;
         }
       }
       // TASK-024: animate the resolved spin from the telemetry side channel
-      // (REQ-008 — the event log itself stays float-free).
-      if (landed && typeof (rt.client as { spinTelemetry?: unknown }).spinTelemetry === 'function') {
+      // (REQ-008 — the event log itself stays float-free). TASK-029: queue
+      // the timed sim events so clicks/bounces sync to the same playback
+      // cursor. The enemy wheel reuses the shared visual playback (one
+      // RenderManager playback at a time), so only side 0 is queued.
+      if (landed && playerLanded &&
+          typeof (rt.client as { spinTelemetry?: unknown }).spinTelemetry === 'function') {
         rm.playSpin(0, rt.client.spinTelemetry(0));
+        sound.queueSimEvents(rt.client.spinSimEvents(0));
+      }
+      // TASK-028: §13.4 recipes react to the same event batch.
+      sound.onEvents(ev.events);
+      // TASK-030: encounter music keyed by the current battle.
+      const battle = rt.client.state().battle;
+      if (battle && !music.playing) {
+        const boss = lastBattleTier === 'boss';
+        const tier = lastBattleTier === 'elite' ? 2 : boss ? 4 : 0;
+        music.start({ tier, boss });
+      } else if (!battle && music.playing) {
+        music.stop();
       }
       // TASK-026: fx react to the same event batch (special-color bursts).
       rm.onEvents(ev.events as never);

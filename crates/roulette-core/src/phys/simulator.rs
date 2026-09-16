@@ -394,13 +394,27 @@ impl Simulator {
     /// agrees with [`SpinResult::slots`] (TEST-010).
     #[cfg(feature = "telemetry")]
     pub fn run_to_completion_with_telemetry(
-        mut self,
+        self,
         nudge_toward: Option<i32>,
     ) -> (Vec<SimEvent>, SpinResult, Vec<TelemetryFrame>) {
+        let (events, result, frames) = self.run_to_completion_with_telemetry_timed(nudge_toward);
+        (events.into_iter().map(|(_, e)| e).collect(), result, frames)
+    }
+
+    /// Like [`Self::run_to_completion_with_telemetry`], but each event is
+    /// paired with the telemetry frame index at which it fired (§5.4 sound
+    /// hooks: the renderer/SoundManager syncs clicks and bounces to the
+    /// playback cursor). Additive under the `telemetry` feature (CON-001).
+    #[cfg(feature = "telemetry")]
+    pub fn run_to_completion_with_telemetry_timed(
+        mut self,
+        nudge_toward: Option<i32>,
+    ) -> (Vec<(u32, SimEvent)>, SpinResult, Vec<TelemetryFrame>) {
         let mut all_events = Vec::new();
         while !self.is_complete() {
             let ev = self.step();
-            all_events.extend(ev);
+            let frame = self.frames.len() as u32;
+            all_events.extend(ev.into_iter().map(|e| (frame, e)));
             self.frames.push(TelemetryFrame { wheel_angle: self.wheel_angle, ball_angles: self.balls.iter().map(|b| b.angle).collect() });
         }
         if let Some(dir) = nudge_toward {

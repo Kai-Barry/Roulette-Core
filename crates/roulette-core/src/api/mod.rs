@@ -156,6 +156,12 @@ pub struct Engine {
     /// on every spin; never serialized into undo.
     #[cfg(feature = "telemetry")]
     spin_frames: Vec<(crate::battle::state::Side, SpinTelemetry)>,
+    /// Last spin's physics sim events paired with their telemetry frame index
+    /// (feature `telemetry`, §5.4 sound hooks). Side channel like
+    /// `spin_frames`: never serialized into undo or the event log (REQ-008 —
+    /// floats never enter `EngineEvent`s; this lives outside them).
+    #[cfg(feature = "telemetry")]
+    spin_sim_events: Vec<(crate::battle::state::Side, Vec<(u32, crate::phys::events::SimEvent)>)>,
 }
 
 /// Side-channel telemetry for one simulated wheel of the last spin
@@ -189,6 +195,8 @@ impl Engine {
             undo: Vec::new(),
             #[cfg(feature = "telemetry")]
             spin_frames: Vec::new(),
+            #[cfg(feature = "telemetry")]
+            spin_sim_events: Vec::new(),
         }
     }
 
@@ -251,6 +259,33 @@ impl Engine {
             }
         }
         Some(out)
+    }
+
+    /// Last spin's physics sim events with telemetry frame indices, JSON
+    /// encoded (feature `telemetry`, §5.4/§10.6 sound hooks): a JSON array of
+    /// `{"frame": u32, "event": <SimEvent>}`. `side` selects the player (0)
+    /// or enemy (1) wheel. `None` when the side was not simulated this spin
+    /// (uniform fast path) or no events fired. Plain JSON keeps the JS glue
+    /// dependency-free (SEC-002 pattern); this is a side channel — it never
+    /// enters the engine event log (REQ-008).
+    #[cfg(feature = "telemetry")]
+    pub fn spin_sim_events_json(&self, side: u8) -> Option<String> {
+        use crate::battle::state::Side;
+        let want = match side {
+            0 => Side::Player,
+            _ => Side::Enemy,
+        };
+        let evs = &self.spin_sim_events.iter().find(|(s, _)| *s == want)?.1;
+        if evs.is_empty() {
+            return None;
+        }
+        #[derive(serde::Serialize)]
+        struct Timed<'a> {
+            frame: u32,
+            event: &'a crate::phys::events::SimEvent,
+        }
+        let timed: Vec<Timed> = evs.iter().map(|(f, e)| Timed { frame: *f, event: e }).collect();
+        Some(serde_json::to_string(&timed).ok()?)
     }
 
     // -- command dispatch ----------------------------------------------------
@@ -764,14 +799,14 @@ impl Engine {
             };
             #[cfg(feature = "telemetry")]
             let result = {
-                let (result, frames) = if self.spin_sampling == SpinSampling::Uniform {
+                let (result, frames, sim_evs) = if self.spin_sampling == SpinSampling::Uniform {
                     let balls = mods.ball_count();
                     let (_, r) = Simulator::uniform_run(&layout, balls, live);
-                    (r, Vec::new())
+                    (r, Vec::new(), Vec::new())
                 } else {
-                    let (_, r, frames) =
-                        Simulator::new(layout.clone(), mods, live).run_to_completion_with_telemetry(nudge);
-                    (r, frames)
+                    let (evs, r, frames) = Simulator::new(layout.clone(), mods, live)
+                        .run_to_completion_with_telemetry_timed(nudge);
+                    (r, frames, evs)
                 };
                 self.spin_frames.retain(|(s, _)| *s != crate::battle::state::Side::Player);
                 self.spin_frames.push((crate::battle::state::Side::Player, SpinTelemetry {
@@ -779,6 +814,8 @@ impl Engine {
                     slot_width: layout.slot_width,
                     frames,
                 }));
+                self.spin_sim_events.retain(|(s, _)| *s != crate::battle::state::Side::Player);
+                self.spin_sim_events.push((crate::battle::state::Side::Player, sim_evs));
                 result
             };
             for &slot in &result.slots {
@@ -817,14 +854,14 @@ impl Engine {
             };
             #[cfg(feature = "telemetry")]
             let result = {
-                let (result, frames) = if self.spin_sampling == SpinSampling::Uniform {
+                let (result, frames, sim_evs) = if self.spin_sampling == SpinSampling::Uniform {
                     let balls = mods.ball_count();
                     let (_, r) = Simulator::uniform_run(&layout, balls, live);
-                    (r, Vec::new())
+                    (r, Vec::new(), Vec::new())
                 } else {
-                    let (_, r, frames) =
-                        Simulator::new(layout.clone(), mods, live).run_to_completion_with_telemetry(None);
-                    (r, frames)
+                    let (evs, r, frames) = Simulator::new(layout.clone(), mods, live)
+                        .run_to_completion_with_telemetry_timed(None);
+                    (r, frames, evs)
                 };
                 self.spin_frames.retain(|(s, _)| *s != crate::battle::state::Side::Enemy);
                 self.spin_frames.push((crate::battle::state::Side::Enemy, SpinTelemetry {
@@ -832,6 +869,8 @@ impl Engine {
                     slot_width: layout.slot_width,
                     frames,
                 }));
+                self.spin_sim_events.retain(|(s, _)| *s != crate::battle::state::Side::Enemy);
+                self.spin_sim_events.push((crate::battle::state::Side::Enemy, sim_evs));
                 result
             };
             for &slot in &result.slots {

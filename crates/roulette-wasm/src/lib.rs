@@ -96,6 +96,18 @@ impl EngineHandle {
     pub fn spin_telemetry(&self, side: u8) -> Vec<u8> {
         self.engine.spin_telemetry_bytes(side).unwrap_or_default()
     }
+
+    /// Physics sim events for the LAST spin with telemetry frame indices
+    /// (TASK-029, feature `telemetry`, CON-001 additive forwarding): JSON
+    /// array of `{"frame": u32, "event": <SimEvent>}` — see
+    /// `roulette_core::api::Engine::spin_sim_events_json`. `side`: 0 = player,
+    /// 1 = enemy. `"[]"` when the side was not simulated (uniform fast path).
+    #[cfg(feature = "telemetry")]
+    pub fn spin_sim_events(&self, side: u8) -> String {
+        self.engine
+            .spin_sim_events_json(side)
+            .unwrap_or_else(|| "[]".to_string())
+    }
 }
 
 fn state_name(gs: roulette_core::run::state::GameState) -> &'static str {
