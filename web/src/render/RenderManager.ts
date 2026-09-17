@@ -119,7 +119,7 @@ export class RenderManager {
 
     this.buildRig();
     if (opts?.webgl && opts.canvas && !opts.no3d && typeof document !== 'undefined') {
-      this.renderer = new WebGLRenderer({ canvas: opts.canvas, antialias: false });
+      this.renderer = new WebGLRenderer({ canvas: opts.canvas, antialias: false, preserveDrawingBuffer: true });
       this.renderer.setPixelRatio(1);
       this.renderer.setSize(opts.canvas.clientWidth || 640, opts.canvas.clientHeight || 360, false);
       this.glTarget = new WebGLRenderTarget(320, 180, { depthBuffer: true });
