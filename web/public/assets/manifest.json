@@ -1,0 +1,71 @@
+{
+  "format": "roulette-asset-manifest/1",
+  "assets": {
+    "croupier_sitting": {
+      "file": "models/croupier_sitting.glb",
+      "sha256": "52c9d6645b227bfe01cc530a5feac685790d7019ea4ef04c6bab6be00c381273",
+      "tris": 1355,
+      "meshes": 1,
+      "primitives": 4,
+      "licence": "CC0-1.0",
+      "ledger": "web/assets-src/LICENSES.md",
+      "budget_tris": 4000,
+      "ok": true
+    },
+    "prop_chair": {
+      "file": "models/prop_chair.glb",
+      "sha256": "e3bb70cebabbfdf8a444c133a4db27ec8b4900d689c25b1e113cbe2fb9fa7327",
+      "tris": 216,
+      "meshes": 1,
+      "primitives": 2,
+      "licence": "CC0-1.0",
+      "ledger": "web/assets-src/LICENSES.md",
+      "budget_tris": 1500,
+      "ok": true
+    },
+    "prop_lamp": {
+      "file": "models/prop_lamp.glb",
+      "sha256": "be29e5a53f3ea9b4024ebcca9f4e397a99b87cc4a5bec8f32acc22941ddfb8e7",
+      "tris": 108,
+      "meshes": 1,
+      "primitives": 2,
+      "licence": "CC0-1.0",
+      "ledger": "web/assets-src/LICENSES.md",
+      "budget_tris": 1500,
+      "ok": true
+    },
+    "prop_stool": {
+      "file": "models/prop_stool.glb",
+      "sha256": "8785da9298b7a656091b17c6deb080e6bd0505b457b20cba1a7b96e73ee716e8",
+      "tris": 224,
+      "meshes": 1,
+      "primitives": 2,
+      "licence": "CC0-1.0",
+      "ledger": "web/assets-src/LICENSES.md",
+      "budget_tris": 1500,
+      "ok": true
+    },
+    "prop_table": {
+      "file": "models/prop_table.glb",
+      "sha256": "34e287029bd6536341857f9274a5c54aa6c8dead43151d2234d7b20af59e6f30",
+      "tris": 144,
+      "meshes": 1,
+      "primitives": 2,
+      "licence": "CC0-1.0",
+      "ledger": "web/assets-src/LICENSES.md",
+      "budget_tris": 1500,
+      "ok": true
+    },
+    "prop_vase": {
+      "file": "models/prop_vase.glb",
+      "sha256": "323d960a4e4ec087866726b6f3d16f19aa117ceb07068d98e5b719e9a2d64664",
+      "tris": 204,
+      "meshes": 1,
+      "primitives": 1,
+      "licence": "CC0-1.0",
+      "ledger": "web/assets-src/LICENSES.md",
+      "budget_tris": 1500,
+      "ok": true
+    }
+  }
+}

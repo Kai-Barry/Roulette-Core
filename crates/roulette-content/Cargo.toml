@@ -1,0 +1,15 @@
+[package]
+name = "roulette-content"
+description = "Data-driven content schema, loader and validator for Roulette.OS"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+ron.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

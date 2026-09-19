@@ -1,4 +1,11 @@
 /target
 /Version1/node_modules
 /Version1/dist
+/node_modules
+/dist
 *.pdb
+
+# P1 asset pipeline: raw downloaded sources stay out of VC (licence ledger + hashes are tracked)
+web/assets-src/*
+!web/assets-src/LICENSES.md
+!web/assets-src/raw-hashes.txt

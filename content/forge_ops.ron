@@ -1,0 +1,24 @@
+// Forge operation vocabulary (blueprint §9.2, TASK-006). Offers are generated
+// per forge node (bronze 50% / silver 35% / gold 15%); these defs carry the
+// op types, price bands and the >= 2-slot rule inputs.
+(
+    schema_version: 1,
+    forge_ops: [
+        (id: "destroy_random_bronze", name: "Chip the Wheel", description: "Destroy 1 random slot.", rarity: bronze, cost: 8,
+         effect: destroy_random(count: 1)),
+        (id: "remove_color_bronze", name: "Bleach Slots", description: "Strip 2 slots of their color.", rarity: bronze, cost: 8,
+         effect: remove_color(color: red, count: 2)),
+        (id: "remove_green_silver", name: "Cut the Jade", description: "Remove a green slot.", rarity: silver, cost: 12,
+         effect: remove_green),
+        (id: "add_color_gold", name: "Gild the Rim", description: "Add 2 gold slots.", rarity: gold, cost: 25,
+         effect: add_color(color: gold, count: 2)),
+        (id: "add_color_silver", name: "Silver Inlay", description: "Add 1 purple slot.", rarity: silver, cost: 14,
+         effect: add_color(color: purple, count: 1)),
+        (id: "upgrade_multiplier_gold", name: "Hot Streak", description: "+0.5 to green payouts.", rarity: gold, cost: 20,
+         effect: upgrade_multiplier(color: green, amount: 0.5)),
+        (id: "convert_color_silver", name: "Repaint", description: "Convert 3 slots from red to black.", rarity: silver, cost: 15,
+         effect: convert_color(from: red, to: black, count: 3)),
+        (id: "convert_color_bronze", name: "Rust Wash", description: "Convert 1 slot from black to red.", rarity: bronze, cost: 10,
+         effect: convert_color(from: black, to: red, count: 1)),
+    ],
+)

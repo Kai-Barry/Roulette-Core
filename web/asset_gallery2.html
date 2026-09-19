@@ -1,0 +1,122 @@
+<!DOCTYPE html><html><head><meta charset="utf8"><style>body{margin:0;background:#0b0d13}</style></head>
+<body><script type="application/json" id="asset-urls">{"cand_lamp_google-w":"/assets/models-candidates/cand_lamp_google-w.glb"}</script><script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+const id = new URLSearchParams(location.search).get('asset');
+const ASSET_URLS = JSON.parse(document.getElementById('asset-urls').textContent);
+const canvas = document.createElement('canvas');
+canvas.width = 640; canvas.height = 480;
+document.body.appendChild(canvas);
+const gl = canvas.getContext('webgl2', { antialias: false, powerPreference: 'low-power', preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ canvas, context: gl, antialias: false });
+renderer.setSize(640, 480, false);
+renderer.useLegacyLights = true;   // r155+ physically-correct lighting made Lambert scenes ~3x darker
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0d13);
+scene.fog = new THREE.Fog(0x0b0d13, 6, 18);
+const cam = new THREE.PerspectiveCamera(50, 640/480, 0.1, 50);
+const key = new THREE.DirectionalLight(0xfff2cc, 3.0); key.position.set(3, 6, 4); scene.add(key);
+const rim = new THREE.DirectionalLight(0x8899ff, 0.7); rim.position.set(-4, 2, -3); scene.add(rim);
+scene.add(new THREE.AmbientLight(0x404050, 2.0));
+// warm bounce from candle-side, low
+const bounce = new THREE.DirectionalLight(0xcc8844, 0.5); bounce.position.set(2, 0.5, 3); scene.add(bounce);
+// felt floor
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 30),
+  new THREE.MeshLambertMaterial({ color: 0x0d3b2a })
+);
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const grid = new THREE.GridHelper(30, 30, 0x123527, 0x123527); scene.add(grid);
+// palette anchors (5-bit pre-quantized)
+const anchors = [0x3a2317, 0xc9a227, 0x0d3b2a, 0xd81838, 0xe8e0c8, 0x2a2a38];
+anchors.forEach((c, i) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshLambertMaterial({ color: c }));
+  m.position.set(-4 + i * 0.9, 0.2, -2); scene.add(m);
+});
+window.__frames = 0;
+let model = null;
+const assetId = new URLSearchParams(location.search).get('asset');
+const assetUrl = ASSET_URLS[assetId] ?? ('/assets/models/' + assetId + '.glb');
+const loader = new GLTFLoader();
+loader.load(assetUrl, (g) => {
+  model = g.scene;
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3(); box.getSize(size);
+  const s = 3.0 / Math.max(size.x, size.y, size.z);
+  model.scale.setScalar(s);
+  box.setFromObject(model);
+  model.position.y -= box.min.y;
+  model.position.x = -(box.min.x + box.max.x) / 2;
+  model.position.z = -(box.min.z + box.max.z) / 2;
+  model.traverse((o) => {
+    if (o.isMesh) {
+      o.material = new THREE.MeshLambertMaterial({ color: o.material.color.clone(), map: o.material.map ?? null });
+    }
+  });
+  scene.add(model);
+  window.__loaded = true;
+}, undefined, (e) => { window.__loadError = String(e); });
+
+// ---- PS1 post pass emulation (matches web/src/render/PS1Shader.ts) ----
+// Two canvases: A renders the 3D scene, B composites the PS1 pass over it.
+// The pass samples canvas A through a CanvasTexture; rendering the result to
+// canvas B avoids the same-canvas sampling feedback loop.
+const POST_W = 320, POST_H = 180;
+const canvasB = document.createElement('canvas');
+canvasB.width = 640; canvasB.height = 480;
+canvasB.style.position = 'absolute';
+canvasB.style.left = '0'; canvasB.style.top = '0';
+document.body.appendChild(canvasB);
+const glB = canvasB.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
+const rendererB = new THREE.WebGLRenderer({ canvas: canvasB, context: glB, antialias: false });
+rendererB.setSize(640, 480, false);
+const ps1Tex = new THREE.CanvasTexture(canvas);
+ps1Tex.magFilter = THREE.NearestFilter;
+ps1Tex.minFilter = THREE.NearestFilter;
+const quadScene = new THREE.Scene();
+const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const bayer = new Float32Array([
+  0.0,0.5,0.125,0.625, 0.75,0.25,0.875,0.375,
+  0.1875,0.6875,0.0625,0.5625, 0.9375,0.4375,0.8125,0.3125]);
+const quadMat = new THREE.ShaderMaterial({
+  uniforms: {
+    tDiffuse: { value: ps1Tex },
+    uResolution: { value: [POST_W, POST_H] },
+    uBayer: { value: bayer },
+  },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uResolution; uniform float uBayer[16];
+    varying vec2 vUv;
+    void main() {
+      vec2 px = vUv * uResolution;
+      vec2 snapped = (floor(px) + 0.5) / uResolution;
+      vec3 c = texture2D(tDiffuse, snapped).rgb;
+      int i = int(mod(px.x, 4.0)) + int(mod(px.y, 4.0)) * 4;
+      float d = 0.0;
+      for (int k = 0; k < 16; k++) { if (k == i) d = uBayer[k]; }
+      c += (d - 0.5) / 32.0;
+      c = floor(c * 31.0 + 0.5) / 31.0;
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`,
+  depthTest: false, depthWrite: false,
+});
+quadScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), quadMat));
+
+let angle = 0;
+const aq = new URLSearchParams(location.search).get('a');
+if (aq) angle = parseFloat(aq);
+function frame() {
+  requestAnimationFrame(frame);
+  if (model) angle += 0.01;
+  const r = 5;
+  cam.position.set(Math.sin(angle) * r, 2.2, Math.cos(angle) * r);
+  cam.lookAt(0, 1.1, 0);
+  renderer.render(scene, cam);
+  ps1Tex.needsUpdate = true;
+  rendererB.render(quadScene, quadCam);
+  window.__frames = (window.__frames ?? 0) + 1;
+}
+frame();
+</script></body></html>

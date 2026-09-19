@@ -1,0 +1,24 @@
+[package]
+name = "roulette-core"
+description = "Headless deterministic engine core for Roulette.OS"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+roulette-content = { path = "../roulette-content" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest = "1"
+
+[features]
+# Additive, non-normative per-frame wheel/ball telemetry for the 3D visual
+# layer (REQ-008: side channel only — the event log stays float-free).
+telemetry = []
+
+[lints]
+workspace = true

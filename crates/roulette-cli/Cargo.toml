@@ -1,0 +1,19 @@
+[package]
+name = "roulette-cli"
+description = "Terminal front-end driving the headless roulette_core engine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "roulette"
+path = "src/main.rs"
+
+[dependencies]
+roulette-core = { path = "../roulette-core" }
+roulette-content = { path = "../roulette-content" }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
