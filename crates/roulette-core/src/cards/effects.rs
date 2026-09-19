@@ -2,8 +2,10 @@
 //!
 //! One switch over the typed `EffectKind` DSL, applied at the §6.4 hook
 //! points. Content is data: cards carry `Vec<EffectKind>`; this module owns
-//! the mechanics. `Ok(false)` = play rejected (Identity Shift with no hand
-//! card); `Ok(true)` = applied.
+//! the mechanics. `Ok(false)` = play rejected (card returns to hand, cost
+//! refunded — e.g. Recycle Bin with an empty discard pile); `Ok(true)` =
+//! applied. Rejections surface as a `card_play_rejected` event at the API
+//! layer, so a play can never repeat as a silent no-op.
 
 use std::collections::BTreeMap;
 
@@ -463,7 +465,15 @@ fn apply_hand_op(
         }
         HandOp::DiscardFromHandDrawOne => {
             if state.hand.is_empty() {
-                return Ok(false);
+                // Degenerate case: no other card to discard. The played card
+                // exiles itself and cycles the deck instead of being
+                // rejected — a rejection would return it to hand and let the
+                // play repeat forever (identity-less loop, ai:check B2).
+                // `temp` skips both felt→discard cleanups, so the exile is
+                // the single copy.
+                played.temp = true;
+                state.draw_free(1);
+                return Ok(true);
             }
             let discarded = state.hand.remove(0);
             state.discard_pile.push(discarded);

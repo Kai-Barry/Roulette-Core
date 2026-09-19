@@ -22,14 +22,14 @@ export interface ScreenCtx {
 export function menuScreen(ctx: ScreenCtx): VNode {
   const subtitle: Record<string, string> = {
     short: 'quick pact — fewer floors',
-    standard: 'the default descent',
+    medium: 'the default descent',
     long: 'full descent — for the damned',
   };
   return h('section', { 'data-screen': 'menu', 'data-test': 'screen-menu' },
     h('h1', {}, 'ROULETTE OF THE DAMNED'),
     h('p', { 'data-test': 'menu-tagline' }, 'ROULETTE.OS — spin against the house, or be spun.'),
     h('div', { 'data-test': 'difficulty-select' },
-      ['short', 'standard', 'long'].map((d) =>
+      ['short', 'medium', 'long'].map((d) =>
         h('button', {
           'data-test': `difficulty-${d}`,
           'data-cmd': JSON.stringify({ cmd: 'start_run', difficulty: d }),

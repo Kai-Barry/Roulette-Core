@@ -461,11 +461,6 @@ fn retain_vision_and_recycle_bin_and_identity_shift() {
     assert!(!play(&mut state, 0, &defs));
     assert_eq!(state.chips_pool, 50, "cost refunded on rejection");
 
-    // Identity Shift with an empty hand is rejected (no card to discard).
-    with_hand(&mut state, &["essence_recycle"]);
-    assert!(!play(&mut state, 0, &defs));
-    assert_eq!(state.chips_pool, 50);
-
     // Identity Shift with a hand card: discards it, draws 1 for free.
     state.draw_pile.push(roulette_core::battle::state::CardInstance {
         def_id: "filler_b".into(),
@@ -478,6 +473,31 @@ fn retain_vision_and_recycle_bin_and_identity_shift() {
     assert!(play(&mut state, 0, &defs));
     assert_eq!(state.hand.len(), 1, "filler_a discarded, drawn card in hand");
     assert_eq!(state.discard_pile.last().map(|c| c.def_id.as_str()), Some("filler_a"));
+
+    // Identity Shift played solo (only copy in hand): no card to discard, so
+    // instead of rejecting (which would return it to hand and allow an
+    // infinite replay loop), the played copy exiles itself and the deck
+    // cycles by 1. Regression for the ai:check B2 no-op loop.
+    state.draw_pile.push(roulette_core::battle::state::CardInstance {
+        def_id: "filler_a".into(),
+        marked_slots: Vec::new(),
+        temp: false,
+        retained: false,
+        cost_override: None,
+    });
+    with_hand(&mut state, &["essence_recycle"]);
+    assert!(play(&mut state, 0, &defs), "solo Identity Shift resolves, not rejects");
+    assert!(
+        state.hand.iter().all(|c| c.def_id != "essence_recycle"),
+        "the played copy left the hand (no repeatable no-op)"
+    );
+    assert_eq!(state.hand.len(), 1, "exiled the played copy, drew 1");
+    assert_eq!(state.hand[0].def_id, "filler_a", "the drawn replacement card");
+    assert!(
+        !state.discard_pile.iter().any(|c| c.def_id == "essence_recycle"),
+        "self-exile must not return to the discard pile"
+    );
+    assert_eq!(state.chips_pool, 49, "cost charged exactly once (no refund)");
 
     // Retain flags hand[0].
     with_hand(&mut state, &["retain_vision", "filler_a"]);

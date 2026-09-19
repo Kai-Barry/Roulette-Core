@@ -27,6 +27,14 @@ pub enum EngineEvent {
         card_id: String,
         cost: u16,
     },
+    /// The play was rejected by its own effects (e.g. Recycle Bin with an
+    /// empty discard pile): the card returned to its hand slot and the cost
+    /// was refunded. Design-audit B2: rejections must be observable so plays
+    /// cannot repeat as silent no-ops.
+    CardPlayRejected {
+        card_id: String,
+        cost: u16,
+    },
     DrawBought {
         cost: u16,
         card_id: String,

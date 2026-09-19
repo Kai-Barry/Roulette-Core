@@ -409,9 +409,17 @@ impl Engine {
                             .unwrap_or_default()
                     }
                     Ok(false) => {
-                        // Rejected play: the card returned to its hand slot.
+                        // Rejected play: the card returned to its hand slot
+                        // and the cost was refunded (B2: observable, not a
+                        // silent no-op).
                         let battle = self.battle.as_ref().ok_or(EngineError::NotInBattle)?;
-                        battle.hand.first().map(|c| c.def_id.clone()).unwrap_or_default()
+                        let def_id =
+                            battle.hand.first().map(|c| c.def_id.clone()).unwrap_or_default();
+                        self.events.push(EngineEvent::CardPlayRejected {
+                            card_id: def_id.clone(),
+                            cost: cost.unwrap_or(0) as u16,
+                        });
+                        def_id
                     }
                     Err(e) => {
                         return Err(EngineError::Action(ActionError::InvalidBet(format!(

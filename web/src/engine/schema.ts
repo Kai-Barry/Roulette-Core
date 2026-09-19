@@ -21,8 +21,8 @@ export const COMMAND_TAGS = [
 ] as const;
 
 export const EVENT_TAGS = [
-  'run_started', 'node_picked', 'battle_started', 'card_played', 'draw_bought',
-  'bet_placed', 'bet_removed', 'bets_cleared', 'rebet', 'sacrificed',
+  'run_started', 'node_picked', 'battle_started', 'card_played', 'card_play_rejected',
+  'draw_bought', 'bet_placed', 'bet_removed', 'bets_cleared', 'rebet', 'sacrificed',
   'prediction_shown', 'spin_started', 'ball_landed', 'spin_resolved',
   'enemy_bet_placed', 'intent_executed', 'round_ended', 'battle_ended',
   'node_completed', 'node_failed', 'reward_cards', 'chips_changed', 'purchased',
@@ -95,6 +95,7 @@ export type EngineEvent =
   | { event: 'node_picked'; id: string; node_type: string }
   | { event: 'battle_started'; tier: string; round_limit: number; enemy_hp: number }
   | { event: 'card_played'; card_id: string; cost: number }
+  | { event: 'card_play_rejected'; card_id: string; cost: number }
   | { event: 'draw_bought'; cost: number; card_id: string }
   | { event: 'bet_placed'; bet: BetType; amount: number }
   | { event: 'bet_removed'; bet: BetType; amount: number }

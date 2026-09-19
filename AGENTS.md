@@ -1,5 +1,43 @@
 # Roulette-Core — repository memory
 
+## Asset pipeline (P1, plan/asset-pipeline-3d-upgrade.md)
+- GLB chunk layout is standard: **JSON chunk `0x4E4F534A` + BIN chunk `0x004E4942`**.
+  (Earlier "JSGN" notes were a transcription error; three r186's GLTFLoader loads
+  standard GLBs fine, with or without embedded PNGs.)
+- **Gallery rendering protocol** (works, `web/asset_gallery2.html` via `/tmp/shots/asset_gallery2.mjs`):
+  puppeteer-core + `/usr/bin/chromium`, `--use-gl=swiftshader --enable-unsafe-swiftshader`,
+  `waitUntil: 'domcontentloaded'` (networkidle0 hangs on the dev server), `webgl2`
+  context + `preserveDrawingBuffer: true`, `renderer.useLegacyLights = true` (r163+
+  physical lighting made Lambert scenes ~3× darker — key 3.0/ambient 2.0 reads well),
+  GL `readPixels` → hand-rolled PNG. PS1-pass preview = two canvases (scene canvas →
+  CanvasTexture → quad shader on second canvas); same-canvas sampling is a feedback loop.
+  ASSETS env var: comma list; `id@url` maps id → arbitrary served URL (append `?v=N`
+  to cache-bust — Chromium caches GLB responses per URL); page gets the id→URL map via
+  inline `<script type="application/json">` (Vite rewrites bare `/assets/...` strings
+  inside inline module scripts otherwise).
+- **Poly Pizza sourcing**: model pages expose og:image = `https://static.poly.pizza/<uuid>.jpg`
+  → GLB is at the same uuid with `.glb` (curl-able, no API key). Licence string
+  (CC0 1.0 / CC-BY 3.0) is in the page HTML; bundle pages (e.g. Kenney Furniture Kit
+  `/bundle/Furniture-Kit-NoG1sEUD1z`) list per-model CDN uuids directly = batch harvest.
+- **GLB JSON chunk magic is `0x4E4F534A` ("JSON")** — earlier "JSGN `0x4E4E5347`"
+  notes were a transcription error; standard GLBs (incl. `bake_palette.py` output)
+  always carried the correct magic and load fine in three r186.
+- **Geometry quality audit** (`/tmp/pp/audit.py`): degenerate-tri count + hard-edge
+  normal-split % distinguishes "crude authoring" (Quaternius furniture: clean but
+  blobby) from "technically broken". Old assets were clean; user's dissatisfaction was
+  author quality → re-sourced 40 candidates (Poly Pizza: Google Poly scans CC-BY,
+  Polygonal Mind CC0, Hunter Paramore CC-BY, Kenney kit CC0) in
+  `web/public/assets/models-candidates/`, contact sheets in `design-review/asset-candidates-v3/`.
+- **Weathering baker** (`/tmp/pp/weather.py`, pattern for `tools/assets/`): per-asset
+  procedural 128px palette-anchored 5-bit-quantized PNG textures; box-projected UVs
+  (dominant normal axis, mod 1) injected for untextured meshes; lamp = original art +
+  grime multiply; materials forced Lambert-grade (metallic 0/roughness 1, PBR extras
+  stripped). GLB rewrite = parse JSON chunk → append BIN blocks (UVs/PNGs) → patch
+  materials → re-emit (JSON 0x4E4F534A + BIN 0x004E4942). User picks + weathered
+  versions: table_round/stool/lamp/vase/basicchar (`<id>-w.glb`), verified changed
+  via render pixel-diffs; `contact-07-weathered.png`.
+- Verdict matrix for the 6 assets: `design-review/asset-candidates-v3/README.md`.
+
 ## Project
 Rust rebuild of the `roulette_core` engine for *Roulette.OS* per
 `docs/ROULETTE_OS_GAME_BLUEPRINT.md` (normative for all constants) and
@@ -19,6 +57,12 @@ Principle: *content is data (RON), mechanics are code, seam is a typed EffectKin
   blueprint cost/rarity, verified programmatically; 8 wheels; 18 upgrades; 10 curses;
   6 enemies; events; forge ops). 15 content tests green, clippy clean.
 - Design-lens audit done: `.agents_tmp/design_audit.md` (findings F1–F5).
+- Full AI playthrough (2026-09-14): `.agents_tmp/playthrough_notes.md`. Key findings:
+  F1 pass-only strategy wins 7/10 seeds (enemy bets negative-EV, pool bleeds);
+  F2 `essence_recycle` no-op infinite loop (hand-only card play refunded) breaks
+  `ai:check` greedy seed 3; F3 `predict` never dispatched by UI; F4 `spin_resolved`
+  has no per-bet breakdown; F6 `round_ended.hp_delta` = curse tick only, intent
+  damage lands at `intent_executed`. American wheel encodes 00 as slot number 37.
 - Phase 2 (GOAL-003) complete: `roulette-core/src/phys/` — WheelLayout,
   PhysicsModifiers (incl. `prediction_accuracy`), 120 Hz Simulator with
   LAUNCH/RIM/PIN/SETTLE phases, all §5.3 cheat hooks, `run_to_completion()`,
@@ -91,7 +135,7 @@ Principle: *content is data (RON), mechanics are code, seam is a typed EffectKin
 - Status: **169 tests / 0 failures / 0 clippy warnings** across workspace; commit 350c34b on main. Next: Phase 7 per PLAN.md (physics integration pass — 120Hz, §13).
 
 ## Phase 0 (3D frontend plan) notes — AI harness + wasm
-- `crates/roulette-wasm`: EngineHandle binding — `new_engine(id)`, `apply_command(cmd_json) -> events_json | Err(error_json)`, `get_state_json()` → `{seed,game_state,run,battle,undo_depth}`, `undo()`, `undo_depth()`. Build: `wasm-pack build --target nodejs --out-dir pkg --release` from the crate dir (~35s); Node loads `pkg/roulette_wasm.js`. wasm panics POISON the instance ("recursive use of an object") — the JS harness then throws on every call; fix panics at the Rust side (serde expectations), never rely on catching them.
+- `crates/roulette-wasm`: EngineHandle binding — `new_engine(id)`, `apply_command(cmd_json) -> events_json | Err(error_json)`, `get_state_json()` → `{seed,game_state,run,battle,undo_depth}`, `undo()`, `undo_depth()`. Build: `wasm-pack build --target nodejs --out-dir pkg --release` from the crate dir (~35s); Node loads `pkg/roulette_wasm.js`. **TWO pkgs, TWO targets — rebuild BOTH after engine changes:** `pkg` = `--target nodejs` (web/test harness via lib.mjs), `pkg-web` = `--target web` (frontend entry.ts). pkg is NOT gitignored — a stale prebuilt pkg silently runs OLD engine code in ai:check while native cargo tests pass (this masked the B2 fix once). wasm panics POISON the instance ("recursive use of an object") — the JS harness then throws on every call; fix panics at the Rust side (serde expectations), never rely on catching them.
 - **serde trap (fixed)**: `EngineEvent` is internally tagged (`#[serde(tag="event")]`) — newtype variants holding plain strings (CardGained(String) etc.) panic at serialize time; they are struct variants now (`card_gained {id}` etc.). Keep it that way.
 - Node harness (`web/test/`): `lib.mjs` = EngineSession + `candidatesFor(state)` (state→legal-command candidates) + `mapCandidates` (mirrors engine `pickable_nodes`); `matchers.mjs` (TASK-002 expectEvents/expectEvent tail-subset matchers); `invariants.mjs` (TASK-004 chips/hp/deck/hand/bets/undo-depth/event-ordering); `node-wasm.mjs` boots and smoke-verifies all three layers (TASK-001). Run: `node web/test/node-wasm.mjs`.
 - Bots (`tools/ai-play.mjs`): `--seed --policy random|greedy|scripted FILE --max-commands --json --difficulty --campaign`. Exit 0 iff terminated + invariants held. Determinism verified: repeated greedy runs byte-identical (REQ-006).
@@ -134,3 +178,19 @@ Principle: *content is data (RON), mechanics are code, seam is a typed EffectKin
   `wasm-pack build --target nodejs --out-dir pkg --release` from that crate dir
   (~35s) or the harness silently runs stale logic — this masked the B1 fix on the
   first sweep re-run.
+
+## Weathering pass (2026-09-17) — lessons
+- **GLB factor×texture trap**: glTF final color = baseColorFactor × texture. Quaternius factors are dark (e.g. Wood = 0.09,0.07,0.04) and crush any baked texture to black. Bakers must set `baseColorFactor = [1,1,1,1]` when adding `baseColorTexture`.
+- **Gallery harness material trap**: the turntable harness rebuilt every mesh material with only `{ color }`, silently discarding `map`. Fixed to `{ color, map }`. Any gallery that rebuilds materials MUST carry the map or the review is invalid.
+- **Review verification protocol** (mandatory after contact-07/08 false positives): (1) deterministic camera `?a=0.9`; (2) `setCacheEnabled(false)` + per-pid disk-cache dir; (3) numeric P/W pixel-diff on the rendered PNGs must pass; (4) then verify on the DISPLAYED browser screenshot (letterboxed geometry — compute display scale, don't assume 1:1), since "file renders" ≠ "user sees it".
+- Authoritative A/B: `design-review/asset-candidates-v3/contact-10-weathered-zoom.png` (PLAIN | WEATHERED | DIFF×4 columns). Weathered GLBs: `web/public/assets/models-candidates/<id>-w.glb`, white factors, 128px palette-anchored 5-bit textures.
+- Weathered diffs (rendered, P/W): vase 44, char 35, table 8, stool 6, lamp 2 (lamp = grime-multiply over kept art, subtlest by design).
+- **v4 tuning (user: v3 "cooked and fried")**: soot coverage cut ~half on wood/cloth/terra (grime 0.8→0.35, cloth 0.75→0.4, terra blotch 0.8→0.45); lamp heavy grime RESTORED — user likes it ("the one in the middle looks good" = lamp row in contact-10). Current A/B: `contact-11-weathered-tuned.png` (PLAIN | V3 | V4). Baked knobs live in /tmp/pp/weather.py (move to tools/assets/ on promotion).
+
+## How to play / drive the UI (2026-09-14 session)
+- **Play in browser**: `npm run dev` (vite :5199, strictPort). `http://127.0.0.1:5199/?seed=X` = real game (module UI overlays the legacy engine-harness page; `?legacy=1` for the old standalone, `?no3d=1` disables 3D). Menu -> difficulty button -> loadout -> map -> combat (chips -> spin) -> shop/forge/event -> victory/game_over.
+- **Difficulty enum is short|medium|long** (Rust `Difficulty` + schema.ts). FIX 2026-09-14: menu sent `standard` -> every dispatch errored ("unknown variant `standard`"), middle button dead for all players. UI test-ids are now `difficulty-short|medium|long`.
+- **Harness global is `window.__RT`** (capital), only installed with `?headless=1` (REQ-004); `?eval=` gate fires at 300ms - usually BEFORE wasm init, so one-shot probes read `LATE`. Use puppeteer + `waitForFunction('window.__RT && window.__RT.state()')` instead (/tmp/shots/click_diag.mjs, play_full.mjs pattern).
+- **vscreen boolean attr encoding** (toDom): `val === true` -> attr present, value `""`; `false`/`undefined` -> attr OMITTED. DOM checks: `getAttribute('data-pickable') !== null` (pickable), `=== null` (not completed). `dataset.x === 'true'` NEVER matches.
+- **Dispatch errors surface only in `#rt-err`** (bottom-right red box) - screenshots won't show it; read its textContent in any UI-driving gate. Engine rejections also land in `__RT.uiFeedback()` (ok:false).
+- Full-UI playthrough verified: medium run -> VICTORY via real button clicks only. Proof: `design-review/playthrough-victory-medium.png`.
