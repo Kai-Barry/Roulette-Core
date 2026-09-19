@@ -1,0 +1,67 @@
+<!DOCTYPE html><html><head><meta charset="utf8"><style>body{margin:0;background:#0b0d13}</style></head>
+<body><script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+const id = new URLSearchParams(location.search).get('asset');
+const canvas = document.createElement('canvas');
+canvas.width = 640; canvas.height = 480;
+document.body.appendChild(canvas);
+const gl = canvas.getContext('webgl2', { antialias: false, powerPreference: 'low-power', preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ canvas, context: gl, antialias: false });
+renderer.setSize(640, 480, false);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0d13);
+scene.fog = new THREE.Fog(0x0b0d13, 6, 18);
+const cam = new THREE.PerspectiveCamera(50, 640/480, 0.1, 50);
+const key = new THREE.DirectionalLight(0xfff2cc, 1.1); key.position.set(3, 6, 4); scene.add(key);
+const rim = new THREE.DirectionalLight(0x8899ff, 0.4); rim.position.set(-4, 2, -3); scene.add(rim);
+scene.add(new THREE.AmbientLight(0x404050, 1.2));
+// felt floor
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 30),
+  new THREE.MeshLambertMaterial({ color: 0x0d3b2a })
+);
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const grid = new THREE.GridHelper(30, 30, 0x123527, 0x123527); scene.add(grid);
+// palette chip references
+const anchors = [0x3a2317, 0xc9a227, 0x0d3b2a, 0xd81838, 0xe8e0c8];
+anchors.forEach((c, i) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshLambertMaterial({ color: c }));
+  m.position.set(-4 + i * 0.9, 0.2, -2); scene.add(m);
+});
+window.__frames = 0;
+let model = null;
+const loader = new GLTFLoader();
+loader.load('/assets/models/' + id + '.glb', (g) => {
+  model = g.scene;
+  // normalize: fit in 3-unit box, sit on floor
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3(); box.getSize(size);
+  const s = 3.0 / Math.max(size.x, size.y, size.z);
+  model.scale.setScalar(s);
+  box.setFromObject(model);
+  model.position.y -= box.min.y;
+  model.position.x = -(box.min.x + box.max.x) / 2;
+  model.position.z = -(box.min.z + box.max.z) / 2;
+  // Lambert-grade: override materials
+  model.traverse((o) => {
+    if (o.isMesh) {
+      o.material = new THREE.MeshLambertMaterial({ color: o.material.color.clone() });
+    }
+  });
+  scene.add(model);
+  window.__loaded = true;
+}, undefined, (e) => { window.__loadError = String(e); });
+
+let angle = 0;
+function frame() {
+  requestAnimationFrame(frame);
+  if (model) angle += 0.01;
+  const r = 5;
+  cam.position.set(Math.sin(angle) * r, 2.2, Math.cos(angle) * r);
+  cam.lookAt(0, 1.1, 0);
+  renderer.render(scene, cam);
+  window.__frames = (window.__frames ?? 0) + 1;
+}
+frame();
+</script></body></html>
