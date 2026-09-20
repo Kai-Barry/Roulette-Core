@@ -93,7 +93,7 @@ export function mapScreen(ctx: ScreenCtx): VNode {
           'data-node-type': n.type,
           'data-node-icon': NODE_ICON[n.type] ?? '?',
           'data-completed': n.completed,
-          'data-pickable': n.pickable,
+          'data-pickable': String(n.pickable),
           'data-floor': n.floor,
           'data-lane': n.lane,
           class: 'rt-map-node',

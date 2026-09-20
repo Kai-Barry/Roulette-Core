@@ -124,7 +124,7 @@ ok('map shows floor progress and pickable/completed flags (#49)', () => {
   assert.equal(fp.attrs['data-floor'], 0);
   assert.ok(Number(fp.attrs['data-floors']) > 0);
   const nodes = queryAll(t, 'map-svg')[0].children.filter((x) => typeof x !== 'string');
-  assert.ok(nodes.some((n) => n.attrs['data-pickable'] === true), 'floor-0 nodes pickable');
+  assert.ok(nodes.some((n) => n.attrs['data-pickable'] === 'true'), 'floor-0 nodes pickable');
 });
 
 ok('#60: two arbitrary nodes never share full visual signature', () => {

@@ -187,6 +187,25 @@ Principle: *content is data (RON), mechanics are code, seam is a typed EffectKin
 - Weathered diffs (rendered, P/W): vase 44, char 35, table 8, stool 6, lamp 2 (lamp = grime-multiply over kept art, subtlest by design).
 - **v4 tuning (user: v3 "cooked and fried")**: soot coverage cut ~half on wood/cloth/terra (grime 0.8→0.35, cloth 0.75→0.4, terra blotch 0.8→0.45); lamp heavy grime RESTORED — user likes it ("the one in the middle looks good" = lamp row in contact-10). Current A/B: `contact-11-weathered-tuned.png` (PLAIN | V3 | V4). Baked knobs live in /tmp/pp/weather.py (move to tools/assets/ on promotion).
 
+## UI-over-3D z-order fix (2026-09-20 session) — CRITICAL
+- **Bug**: `#rt-shell` (DOM UI) was opaque (`background:#0b0d13`) at z-index 5000,
+  fully covering `#rt-canvas` (z-index 4990) → players NEVER saw the 3D view, and
+  the shell swallowed all pointer events (felt/bell raycast picking dead in practice).
+  The WebGL layer rendered correctly the whole time (proved via
+  `preserveDrawingBuffer` canvas dump: felt green `(0,90,41)`, red accents present).
+- **Fix** (web/src/entry.ts): `#rt-shell { background: transparent; pointer-events: none; }`
+  (canvas keeps pointer events for raycast picking; DOM buttons still work).
+  Also `data-pickable` now `String(n.pickable)` in screens.ts — boolean attrs
+  serialize as `""` in DOM, so `[data-pickable="true"]` CSS never matched before
+  (map glow was invisible); ui.test.mjs assertion updated to match string.
+- **Probe protocol for UI+3D bugs**: render-test cwd artifact — run
+  `node web/test/render.test.mjs` from `web/` (from repo root it miscounts).
+  `dist/` rebuild needs `sudo rm -rf dist` first if a root-owned build is present.
+  Full walkthrough shots: `design-review/ui-4-screens-fixed.png` (4 screens strip).
+  Vite dev server must be started as `npx vite --port 5199 --strictPort`
+  (default port moved to 5173 after config change); reachable as `localhost`,
+  NOT `127.0.0.1` (IPv6/IPv4 bind mismatch in this sandbox).
+
 ## How to play / drive the UI (2026-09-14 session)
 - **Play in browser**: `npm run dev` (vite :5199, strictPort). `http://127.0.0.1:5199/?seed=X` = real game (module UI overlays the legacy engine-harness page; `?legacy=1` for the old standalone, `?no3d=1` disables 3D). Menu -> difficulty button -> loadout -> map -> combat (chips -> spin) -> shop/forge/event -> victory/game_over.
 - **Difficulty enum is short|medium|long** (Rust `Difficulty` + schema.ts). FIX 2026-09-14: menu sent `standard` -> every dispatch errored ("unknown variant `standard`"), middle button dead for all players. UI test-ids are now `difficulty-short|medium|long`.

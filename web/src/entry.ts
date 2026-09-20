@@ -40,7 +40,8 @@ async function main(): Promise<void> {
   const style = document.createElement('style');
   style.textContent = [
     '#rt-shell { position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column;',
-    '  background: #0b0d13; color: #e8eaf2; font: 14px/1.45 system-ui, sans-serif; overflow: auto; }',
+    '  background: transparent; color: #e8eaf2; font: 14px/1.45 system-ui, sans-serif; overflow: auto;',
+    '  pointer-events: none; }',
     '#rt-canvas { position: fixed; inset: 0; z-index: 4990; width: 100%; height: 100%; }',
     '#rt-err { position: fixed; bottom: 8px; left: 8px; z-index: 6000; margin: 0; padding: 8px;',
     '  color: #ff8a80; background: #1a0d12; border: 1px solid #ff8a80; font: 12px/1.4 monospace; }',
